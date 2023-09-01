@@ -18,8 +18,8 @@ enum HTTPClientErrors: Error {
 }
 
 public class HTTPClient {
-    private static let defaultAPIHost = "api.segment.io/v1"
-    private static let defaultCDNHost = "cdn-settings.segment.com/v1"
+    private static let defaultAPIHost = "events.us-east-1.hightouch.com/v1"
+    private static let defaultCDNHost = "events.us-east-1.hightouch.com/v1"
     
     internal var session: URLSession
     private var apiHost: String
@@ -39,7 +39,10 @@ public class HTTPClient {
     }
     
     func segmentURL(for host: String, path: String) -> URL? {
-        let s = "https://\(host)\(path)"
+        var s = "https://\(host)\(path)"
+        if host.hasPrefix("localhost") {
+            s = "http://\(host)\(path)"
+        }
         let result = URL(string: s)
         return result
     }
