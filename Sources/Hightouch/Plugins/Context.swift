@@ -58,7 +58,7 @@ public class Context: PlatformPlugin {
         // library name
         staticContext["library"] = [
             "name": "analytics-swift",
-            "version": __segment_version,
+            "version": __hightouch_version,
         ]
         
         // app info

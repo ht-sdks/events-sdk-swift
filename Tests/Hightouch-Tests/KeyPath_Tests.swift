@@ -1,12 +1,12 @@
 //
 //  KeyPath_Tests.swift
-//  Segment-Tests
+//  Hightouch-Tests
 //
 //  Created by Brandon Sneed on 3/19/21.
 //
 
 import XCTest
-@testable import Segment
+@testable import Hightouch
 
 class KeyPath_Tests: XCTestCase {
     let baseDictionary: [String: Any] = [

@@ -30,7 +30,7 @@
 // SOFTWARE.
 
 import Foundation
-import Segment
+import Hightouch
 
 class InjectTraits: Plugin {
     let type = PluginType.enrichment

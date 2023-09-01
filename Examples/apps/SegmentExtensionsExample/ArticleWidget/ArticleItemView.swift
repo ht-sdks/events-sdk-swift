@@ -6,7 +6,7 @@
 //
 
 import SwiftUI
-import Segment
+import Hightouch
 
 struct ArticleItemView: View {
     var article : Article

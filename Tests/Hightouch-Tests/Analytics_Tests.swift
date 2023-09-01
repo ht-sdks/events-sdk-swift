@@ -1,5 +1,5 @@
 import XCTest
-@testable import Segment
+@testable import Hightouch
 
 final class Analytics_Tests: XCTestCase {
     

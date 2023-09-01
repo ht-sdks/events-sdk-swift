@@ -6,7 +6,7 @@
 //
 
 import WatchKit
-import Segment
+import Hightouch
 
 class ExtensionDelegate: NSObject, WKExtensionDelegate {
     var analytics: Analytics? = nil

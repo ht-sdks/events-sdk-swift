@@ -228,7 +228,7 @@ extension Analytics {
     /// Retrieve the version of this library in use.
     /// - Returns: A string representing the version in "BREAKING.FEATURE.FIX" format.
     public static func version() -> String {
-        return __segment_version
+        return __hightouch_version
     }
 }
 

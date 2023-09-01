@@ -1,6 +1,6 @@
 //
 //  ObjC_Tests.swift
-//  Segment-Tests
+//  Hightouch-Tests
 //
 //  Created by Brandon Sneed on 8/13/21.
 //
@@ -8,7 +8,7 @@
 #if !os(Linux)
 
 import XCTest
-@testable import Segment
+@testable import Hightouch
 
 class ObjC_Tests: XCTestCase {
 

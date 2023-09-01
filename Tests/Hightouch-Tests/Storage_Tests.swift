@@ -1,12 +1,12 @@
 //
 //  StorageTests.swift
-//  Segment-Tests
+//  Hightouch-Tests
 //
 //  Created by Brandon Sneed on 1/7/21.
 //
 
 import XCTest
-@testable import Segment
+@testable import Hightouch
 
 class StorageTests: XCTestCase {
 

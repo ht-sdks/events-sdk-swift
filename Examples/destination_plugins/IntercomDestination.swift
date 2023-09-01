@@ -5,7 +5,7 @@
 //  Created by Cody Garvin on 9/21/21.
 //
 
-import Segment
+import Hightouch
 import Intercom
 import CoreMedia
 

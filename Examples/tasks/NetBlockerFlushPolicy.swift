@@ -32,7 +32,7 @@ import Foundation
 // SOFTWARE.
 
 import Foundation
-import Segment
+import Hightouch
 
 public class NetBlockerFlushPolicy: FlushPolicy {
     public var type = PluginType.utility

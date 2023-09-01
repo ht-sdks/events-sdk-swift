@@ -1,13 +1,13 @@
 //
 //  TestUtilities.swift
-//  Segment-Tests
+//  Hightouch-Tests
 //
 //  Created by Brandon Sneed on 1/6/21.
 //
 
 import Foundation
 import XCTest
-@testable import Segment
+@testable import Hightouch
 
 extension UUID{
     public func asUInt8Array() -> [UInt8]{

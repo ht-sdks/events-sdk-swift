@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import Segment
+import Hightouch
 
 struct Article {
     let title: String

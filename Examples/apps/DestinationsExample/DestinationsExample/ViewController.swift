@@ -6,7 +6,7 @@
 //
 
 import UIKit
-import Segment
+import Hightouch
 import AppsFlyerLib
 
 enum SpecEvent: Int {

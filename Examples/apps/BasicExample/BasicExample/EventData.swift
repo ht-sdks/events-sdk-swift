@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import Segment
+import Hightouch
 import UIKit
 
 struct UserTraits: Codable {

@@ -6,7 +6,7 @@
 //
 
 import XCTest
-@testable import Segment
+@testable import Hightouch
 
 final class MemoryLeak_Tests: XCTestCase {
 

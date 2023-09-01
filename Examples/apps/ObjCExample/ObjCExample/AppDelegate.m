@@ -8,7 +8,7 @@
 #import "AppDelegate.h"
 #import "ObjCExample-Swift.h"
 
-@import Segment;
+@import Hightouch;
 @import SegmentMixpanel;
 
 @interface AppDelegate ()

@@ -34,7 +34,7 @@
 // SOFTWARE.
 
 import Foundation
-import Segment
+import Hightouch
 //import ExampleModule // TODO: Import partner SDK module here
 
 /**

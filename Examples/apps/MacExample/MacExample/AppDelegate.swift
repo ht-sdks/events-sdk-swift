@@ -6,7 +6,7 @@
 //
 
 import Cocoa
-import Segment
+import Hightouch
 
 @main
 class AppDelegate: NSObject, NSApplicationDelegate {

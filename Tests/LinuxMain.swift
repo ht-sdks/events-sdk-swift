@@ -1,7 +1,7 @@
 import XCTest
 
-import Segment_Tests
+import Hightouch_Tests
 
 var tests = [XCTestCaseEntry]()
-tests += Segment_SwiftTests.allTests()
+tests += Hightouch_SwiftTests.allTests()
 XCTMain(tests)

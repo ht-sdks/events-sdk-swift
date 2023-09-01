@@ -6,7 +6,7 @@
 //
 
 import UIKit
-import Segment
+import Hightouch
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {

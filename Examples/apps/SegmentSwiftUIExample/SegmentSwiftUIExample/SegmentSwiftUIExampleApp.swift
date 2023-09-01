@@ -6,7 +6,7 @@
 //
 
 import SwiftUI
-import Segment
+import Hightouch
 
 @main
 struct SegmentSwiftUIExampleApp: App {

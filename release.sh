@@ -1,7 +1,7 @@
 #!/bin/bash
 
 PROJECT_NAME="Analytics-Swift"
-PRODUCT_NAME="Segment"
+PRODUCT_NAME="Hightouch"
 
 LOWER_PRODUCT_NAME="$(echo ${PRODUCT_NAME} | tr '[:upper:]' '[:lower:]')"
 
@@ -126,7 +126,7 @@ tempFile=$(mktemp)
 #write changelog to temp file.
 echo -e "$changelog" >> $tempFile
 
-# update sources/Segment/Version.swift
+# update sources/Hightouch/Version.swift
 # - remove last line...
 sed -i '' -e '$ d' $versionFile
 # - add new line w/ new version

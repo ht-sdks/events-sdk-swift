@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import Segment
+import Hightouch
 
 class WeatherService {
     let url = URL(string: "https://api.lil.software/weather?latitude=37.7749&longitude=-122.4194")!

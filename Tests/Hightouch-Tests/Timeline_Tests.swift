@@ -6,7 +6,7 @@
 //
 
 import XCTest
-@testable import Segment
+@testable import Hightouch
 
 class Timeline_Tests: XCTestCase {
 

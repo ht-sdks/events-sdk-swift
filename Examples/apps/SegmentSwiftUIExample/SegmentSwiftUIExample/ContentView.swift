@@ -6,7 +6,7 @@
 //
 
 import SwiftUI
-import Segment
+import Hightouch
 
 struct ContentView: View {
     var body: some View {
