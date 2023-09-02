@@ -68,10 +68,10 @@ struct WeatherWidget: Widget {
     let kind: String = "WeatherWidget"
     var analytics: Analytics?
     init() {
-        let configuration = Segment.Configuration(writeKey: "WRITE_KEY")
+        let configuration = Hightouch.Configuration(writeKey: "WRITE_KEY")
 
         configuration.flushAt(1)
-        analytics = Segment.Analytics(configuration: configuration)
+        analytics = Hightouch.Analytics(configuration: configuration)
         analytics?.track(name: "Widget Launched")
     }
     
