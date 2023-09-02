@@ -19,8 +19,8 @@
 		46E3834E26582D9E00BA2502 /* IDFACollection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46E3834A26582D9E00BA2502 /* IDFACollection.swift */; };
 		46E3835326582DA400BA2502 /* CustomScreenTracking.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46E3835126582DA400BA2502 /* CustomScreenTracking.swift */; };
 		46E3835426582DA400BA2502 /* MultiInstance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46E3835226582DA400BA2502 /* MultiInstance.swift */; };
-		46E383572658307800BA2502 /* Segment in Frameworks */ = {isa = PBXBuildFile; productRef = 46E383562658307800BA2502 /* Segment */; };
 		46E73DA326F531320021042C /* NotificationTracking.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46E73DA226F531320021042C /* NotificationTracking.swift */; };
+		8EA3F14B2AA2CD880088065D /* Hightouch in Frameworks */ = {isa = PBXBuildFile; productRef = 8EA3F14A2AA2CD880088065D /* Hightouch */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -48,7 +48,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				46E383572658307800BA2502 /* Segment in Frameworks */,
+				8EA3F14B2AA2CD880088065D /* Hightouch in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -138,7 +138,7 @@
 			);
 			name = SegmentUIKitExample;
 			packageProductDependencies = (
-				46E383562658307800BA2502 /* Segment */,
+				8EA3F14A2AA2CD880088065D /* Hightouch */,
 			);
 			productName = SegmentUIKitExample;
 			productReference = 46022781261F860100A9E913 /* SegmentUIKitExample.app */;
@@ -444,9 +444,9 @@
 			package = 4602279B261F884600A9E913 /* XCRemoteSwiftPackageReference "analytics-swift" */;
 			productName = Segment;
 		};
-		46E383562658307800BA2502 /* Segment */ = {
+		8EA3F14A2AA2CD880088065D /* Hightouch */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = Segment;
+			productName = Hightouch;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

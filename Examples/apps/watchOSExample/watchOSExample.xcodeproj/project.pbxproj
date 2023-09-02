@@ -18,8 +18,8 @@
 		469ECD652684F9090028BE9A /* NotificationController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 469ECD642684F9090028BE9A /* NotificationController.swift */; };
 		469ECD672684F9090028BE9A /* ComplicationController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 469ECD662684F9090028BE9A /* ComplicationController.swift */; };
 		469ECD692684F90A0028BE9A /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 469ECD682684F90A0028BE9A /* Assets.xcassets */; };
-		469ECD7B2684FD710028BE9A /* Segment in Frameworks */ = {isa = PBXBuildFile; productRef = 469ECD7A2684FD710028BE9A /* Segment */; };
 		46E73DA626F5389E0021042C /* NotificationTracking.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46E73DA526F5389E0021042C /* NotificationTracking.swift */; };
+		8EA3F1512AA2CDF60088065D /* Hightouch in Frameworks */ = {isa = PBXBuildFile; productRef = 8EA3F1502AA2CDF60088065D /* Hightouch */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -88,7 +88,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				469ECD7B2684FD710028BE9A /* Segment in Frameworks */,
+				8EA3F1512AA2CDF60088065D /* Hightouch in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -208,7 +208,7 @@
 			);
 			name = "watchOSExample WatchKit Extension";
 			packageProductDependencies = (
-				469ECD7A2684FD710028BE9A /* Segment */,
+				8EA3F1502AA2CDF60088065D /* Hightouch */,
 			);
 			productName = "watchOSExample WatchKit Extension";
 			productReference = 469ECD5B2684F9090028BE9A /* watchOSExample WatchKit Extension.appex */;
@@ -583,9 +583,9 @@
 /* End XCConfigurationList section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		469ECD7A2684FD710028BE9A /* Segment */ = {
+		8EA3F1502AA2CDF60088065D /* Hightouch */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = Segment;
+			productName = Hightouch;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

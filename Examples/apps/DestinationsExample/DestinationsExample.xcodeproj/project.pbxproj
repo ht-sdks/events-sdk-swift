@@ -23,7 +23,7 @@
 		469F7B0F266011690038E773 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 469F7B0D266011690038E773 /* Main.storyboard */; };
 		469F7B112660116A0038E773 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 469F7B102660116A0038E773 /* Assets.xcassets */; };
 		469F7B142660116A0038E773 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 469F7B122660116A0038E773 /* LaunchScreen.storyboard */; };
-		469F7B1D266011D70038E773 /* Segment in Frameworks */ = {isa = PBXBuildFile; productRef = 469F7B1C266011D70038E773 /* Segment */; };
+		8EA3F1432AA2CD080088065D /* Hightouch in Frameworks */ = {isa = PBXBuildFile; productRef = 8EA3F1422AA2CD080088065D /* Hightouch */; };
 		965DC1262671656C00DDF9C7 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 965DC1252671656C00DDF9C7 /* GoogleService-Info.plist */; };
 		9697C1F52679156C00B87EC1 /* Segment_Logo_Avatar_Grey-1024.png in Resources */ = {isa = PBXBuildFile; fileRef = 9697C1F42679156C00B87EC1 /* Segment_Logo_Avatar_Grey-1024.png */; };
 /* End PBXBuildFile section */
@@ -57,8 +57,8 @@
 				468DE06E27D28D1300F2D94B /* SegmentFirebase in Frameworks */,
 				469EC8D0266066130068F9E3 /* SystemConfiguration.framework in Frameworks */,
 				468DE06827D28C7E00F2D94B /* SegmentAppsFlyer in Frameworks */,
+				8EA3F1432AA2CD080088065D /* Hightouch in Frameworks */,
 				468DE07127D28D4700F2D94B /* SegmentMixpanel in Frameworks */,
-				469F7B1D266011D70038E773 /* Segment in Frameworks */,
 				468DE06527D28C6500F2D94B /* SegmentAmplitude in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -147,12 +147,12 @@
 			);
 			name = DestinationsExample;
 			packageProductDependencies = (
-				469F7B1C266011D70038E773 /* Segment */,
 				468DE06427D28C6500F2D94B /* SegmentAmplitude */,
 				468DE06727D28C7E00F2D94B /* SegmentAppsFlyer */,
 				468DE06A27D28CB200F2D94B /* SegmentFacebook */,
 				468DE06D27D28D1300F2D94B /* SegmentFirebase */,
 				468DE07027D28D4700F2D94B /* SegmentMixpanel */,
+				8EA3F1422AA2CD080088065D /* Hightouch */,
 			);
 			productName = DestinationsExample;
 			productReference = 469F7B04266011690038E773 /* DestinationsExample.app */;
@@ -503,9 +503,9 @@
 			package = 468DE06F27D28D4700F2D94B /* XCRemoteSwiftPackageReference "analytics-swift-mixpanel" */;
 			productName = SegmentMixpanel;
 		};
-		469F7B1C266011D70038E773 /* Segment */ = {
+		8EA3F1422AA2CD080088065D /* Hightouch */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = Segment;
+			productName = Hightouch;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

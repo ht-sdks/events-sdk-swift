@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		46016C1326BB5BD700BCEE80 /* Segment in Frameworks */ = {isa = PBXBuildFile; productRef = 46016C1226BB5BD700BCEE80 /* Segment */; };
+		8EA3F1492AA2CD630088065D /* Hightouch in Frameworks */ = {isa = PBXBuildFile; productRef = 8EA3F1482AA2CD630088065D /* Hightouch */; };
 		9613E655265C2E350078A2BD /* SegmentSwiftUIExampleApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9613E654265C2E350078A2BD /* SegmentSwiftUIExampleApp.swift */; };
 		9613E657265C2E350078A2BD /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9613E656265C2E350078A2BD /* ContentView.swift */; };
 		9613E659265C2E360078A2BD /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 9613E658265C2E360078A2BD /* Assets.xcassets */; };
@@ -28,7 +28,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				46016C1326BB5BD700BCEE80 /* Segment in Frameworks */,
+				8EA3F1492AA2CD630088065D /* Hightouch in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -96,7 +96,7 @@
 			);
 			name = SegmentSwiftUIExample;
 			packageProductDependencies = (
-				46016C1226BB5BD700BCEE80 /* Segment */,
+				8EA3F1482AA2CD630088065D /* Hightouch */,
 			);
 			productName = SegmentSwiftUIExample;
 			productReference = 9613E651265C2E350078A2BD /* SegmentSwiftUIExample.app */;
@@ -343,9 +343,9 @@
 /* End XCConfigurationList section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		46016C1226BB5BD700BCEE80 /* Segment */ = {
+		8EA3F1482AA2CD630088065D /* Hightouch */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = Segment;
+			productName = Hightouch;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		8EA3F1472AA2CD4C0088065D /* Hightouch in Frameworks */ = {isa = PBXBuildFile; productRef = 8EA3F1462AA2CD4C0088065D /* Hightouch */; };
 		BA1D8C4F26C2D92F00B8185B /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA1D8C4E26C2D92F00B8185B /* AppDelegate.swift */; };
 		BA1D8C5126C2D92F00B8185B /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA1D8C5026C2D92F00B8185B /* SceneDelegate.swift */; };
 		BA1D8C5626C2D92F00B8185B /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = BA1D8C5426C2D92F00B8185B /* Main.storyboard */; };
@@ -23,7 +24,6 @@
 		BAA1FCDA26C9957A0022822C /* Article.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAA1FCD826C98ED80022822C /* Article.swift */; };
 		BAA1FCDF26C996EF0022822C /* ArticleItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAA1FCDD26C996CD0022822C /* ArticleItemView.swift */; };
 		BAA1FCE226C9983F0022822C /* ArticleSectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAA1FCE026C998280022822C /* ArticleSectionView.swift */; };
-		BAC3990026CAF7FB00B6915B /* Segment in Frameworks */ = {isa = PBXBuildFile; productRef = BAC398FF26CAF7FB00B6915B /* Segment */; };
 		BAC3990226CAF81200B6915B /* Segment in Frameworks */ = {isa = PBXBuildFile; productRef = BAC3990126CAF81200B6915B /* Segment */; };
 /* End PBXBuildFile section */
 
@@ -79,7 +79,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				BAC3990026CAF7FB00B6915B /* Segment in Frameworks */,
+				8EA3F1472AA2CD4C0088065D /* Hightouch in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -181,7 +181,7 @@
 			);
 			name = SegmentExtensionsExample;
 			packageProductDependencies = (
-				BAC398FF26CAF7FB00B6915B /* Segment */,
+				8EA3F1462AA2CD4C0088065D /* Hightouch */,
 			);
 			productName = SegmentExtensionsExample;
 			productReference = BA1D8C4B26C2D92F00B8185B /* SegmentExtensionsExample.app */;
@@ -569,13 +569,13 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		8EA3F1462AA2CD4C0088065D /* Hightouch */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Hightouch;
+		};
 		BAA1FCE326C99CD30022822C /* Segment */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = BA1D8C6A26C4750F00B8185B /* XCRemoteSwiftPackageReference "analytics-swift" */;
-			productName = Segment;
-		};
-		BAC398FF26CAF7FB00B6915B /* Segment */ = {
-			isa = XCSwiftPackageProductDependency;
 			productName = Segment;
 		};
 		BAC3990126CAF81200B6915B /* Segment */ = {

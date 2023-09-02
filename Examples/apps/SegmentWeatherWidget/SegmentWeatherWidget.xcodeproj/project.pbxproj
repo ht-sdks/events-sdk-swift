@@ -7,8 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		82C21C9E2913169C00121B41 /* Segment in Frameworks */ = {isa = PBXBuildFile; productRef = 82C21C9D2913169C00121B41 /* Segment */; };
-		82C21CA0291316B500121B41 /* Segment in Frameworks */ = {isa = PBXBuildFile; productRef = 82C21C9F291316B500121B41 /* Segment */; };
 		82E374D22909C8D1002CFC26 /* SegmentWeatherWidgetApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82E374D12909C8D1002CFC26 /* SegmentWeatherWidgetApp.swift */; };
 		82E374D42909C8D1002CFC26 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82E374D32909C8D1002CFC26 /* ContentView.swift */; };
 		82E374D62909C8D3002CFC26 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 82E374D52909C8D3002CFC26 /* Assets.xcassets */; };
@@ -25,6 +23,8 @@
 		82E375072909C9F2002CFC26 /* WeatherUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82E374FE2909C9F2002CFC26 /* WeatherUtils.swift */; };
 		82E375082909C9F2002CFC26 /* Date+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82E374FF2909C9F2002CFC26 /* Date+Extensions.swift */; };
 		82E3750C2909C9F2002CFC26 /* WeatherWidgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82E375042909C9F2002CFC26 /* WeatherWidgetView.swift */; };
+		8EA3F14D2AA2CDA30088065D /* Hightouch in Frameworks */ = {isa = PBXBuildFile; productRef = 8EA3F14C2AA2CDA30088065D /* Hightouch */; };
+		8EA3F14F2AA2CDAD0088065D /* Hightouch in Frameworks */ = {isa = PBXBuildFile; productRef = 8EA3F14E2AA2CDAD0088065D /* Hightouch */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -77,7 +77,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				82C21C9E2913169C00121B41 /* Segment in Frameworks */,
+				8EA3F14D2AA2CDA30088065D /* Hightouch in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -85,7 +85,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				82C21CA0291316B500121B41 /* Segment in Frameworks */,
+				8EA3F14F2AA2CDAD0088065D /* Hightouch in Frameworks */,
 				82E374E82909C908002CFC26 /* SwiftUI.framework in Frameworks */,
 				82E374E62909C908002CFC26 /* WidgetKit.framework in Frameworks */,
 			);
@@ -201,7 +201,7 @@
 			);
 			name = SegmentWeatherWidget;
 			packageProductDependencies = (
-				82C21C9D2913169C00121B41 /* Segment */,
+				8EA3F14C2AA2CDA30088065D /* Hightouch */,
 			);
 			productName = SegmentWeatherWidget;
 			productReference = 82E374CE2909C8D1002CFC26 /* SegmentWeatherWidget.app */;
@@ -221,7 +221,7 @@
 			);
 			name = WeatherWidgetExtension;
 			packageProductDependencies = (
-				82C21C9F291316B500121B41 /* Segment */,
+				8EA3F14E2AA2CDAD0088065D /* Hightouch */,
 			);
 			productName = WeatherWidgetExtension;
 			productReference = 82E374E32909C908002CFC26 /* WeatherWidgetExtension.appex */;
@@ -585,13 +585,13 @@
 /* End XCConfigurationList section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		82C21C9D2913169C00121B41 /* Segment */ = {
+		8EA3F14C2AA2CDA30088065D /* Hightouch */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = Segment;
+			productName = Hightouch;
 		};
-		82C21C9F291316B500121B41 /* Segment */ = {
+		8EA3F14E2AA2CDAD0088065D /* Hightouch */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = Segment;
+			productName = Hightouch;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
