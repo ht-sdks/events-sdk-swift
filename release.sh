@@ -1,6 +1,6 @@
 #!/bin/bash
 
-PROJECT_NAME="Analytics-Swift"
+PROJECT_NAME="events-sdk-swift"
 PRODUCT_NAME="Hightouch"
 
 LOWER_PRODUCT_NAME="$(echo ${PRODUCT_NAME} | tr '[:upper:]' '[:lower:]')"

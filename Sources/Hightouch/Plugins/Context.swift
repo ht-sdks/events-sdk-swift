@@ -57,7 +57,7 @@ public class Context: PlatformPlugin {
         
         // library name
         staticContext["library"] = [
-            "name": "analytics-swift",
+            "name": "events-sdk-swift",
             "version": __hightouch_version,
         ]
         

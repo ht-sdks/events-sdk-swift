@@ -9,8 +9,7 @@ This SDK is available through [**Swift Package Manager (SPM)**](https://www.swif
 1. Xcode 12: **File > Swift Packages > Add Package Dependency**
 2. Xcode 13: **File > Add Packages…**
 3. Search for `git@github.com:ht-sdks/events-sdk-swift.git`
-4. In **Dependency Rule**, select **Up to Next Major Version**, and enter `1.0.0` as the value.
-5. Click **Add Package**.
+4. Click **Add Package**.
 
 ### [Option 2] Package.swift
 
