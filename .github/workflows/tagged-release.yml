@@ -1,0 +1,58 @@
+name: Tagged release
+
+# See release.sh for information about release process
+
+on:
+  push:
+    # Pattern matched against refs/tags
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  id-token: write # allows the JWT to be requested from GitHub's OIDC provider
+  contents: read # This is required for actions/checkout
+
+jobs:
+  deploy-release:
+    name: Message slack about latest release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source branch
+        uses: actions/checkout@v3
+
+      - name: Get new version number
+        run: |
+          echo "SEMVER=$GITHUB_REF_NAME" >> $GITHUB_ENV
+          echo "DATE=$(date)" >> $GITHUB_ENV
+
+      - name: Send message to Slack channel
+        id: slack
+        uses: slackapi/slack-github-action@v1.23.0
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          PROJECT_NAME: "Swift SDK"
+          PACKAGE_URL: "https://github.com/ht-sdks/events-sdk-swift/releases"
+        with:
+          channel-id: ${{ secrets.SLACK_RELEASE_CHANNEL_ID }}
+          payload: |
+            {
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "New release: ${{ env.PROJECT_NAME }}"
+                  }
+                },
+                {
+                  "type": "divider"
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Release: <${{ env.PACKAGE_URL }}|${{ env.SEMVER }}>*\n${{ env.DATE }}"
+                  }
+                }
+              ]
+            }
