@@ -11,7 +11,7 @@ import Foundation
 
 // MARK: - ObjC Compatibility
 
-@objc(SEGAnalytics)
+@objc(HTAnalytics)
 public class ObjCAnalytics: NSObject {
     /// The underlying Analytics object we're working with
     public let analytics: Analytics

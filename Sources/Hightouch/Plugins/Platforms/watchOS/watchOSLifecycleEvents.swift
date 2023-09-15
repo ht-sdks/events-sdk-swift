@@ -11,8 +11,8 @@ import Foundation
 import WatchKit
 
 class watchOSLifecycleEvents: PlatformPlugin, watchOSLifecycle {
-    static var versionKey = "SEGVersionKey"
-    static var buildKey = "SEGBuildKeyV2"
+    static var versionKey = "HTVersionKey"
+    static var buildKey = "HTBuildKeyV2"
     
     let type = PluginType.before
     weak var analytics: Analytics?

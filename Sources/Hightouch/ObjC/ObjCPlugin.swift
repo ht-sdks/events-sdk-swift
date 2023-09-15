@@ -10,7 +10,7 @@
 
 import Foundation
 
-@objc(SEGPlugin)
+@objc(HTPlugin)
 public protocol ObjCPlugin {}
 
 public protocol ObjCPluginShim {
@@ -20,14 +20,14 @@ public protocol ObjCPluginShim {
 // NOTE: Destination plugins need something similar to the following to work/
 /*
 
-@objc(SEGMixpanelDestination)
+@objc(HTMixpanelDestination)
 public class ObjCSegmentMixpanel: NSObject, ObjCPlugin, ObjCPluginShim {
     public func instance() -> EventPlugin { return MixpanelDestination() }
 }
 
 */
 
-@objc(SEGEventPlugin)
+@objc(HTEventPlugin)
 public class ObjCEventPlugin: NSObject, EventPlugin, ObjCPlugin {
     public var type: PluginType = .enrichment
     public var analytics: Analytics? = nil
@@ -35,7 +35,7 @@ public class ObjCEventPlugin: NSObject, EventPlugin, ObjCPlugin {
     @objc(executeEvent:)
     public func execute(event: ObjCRawEvent?) -> ObjCRawEvent? {
         #if DEBUG
-        print("SEGEventPlugin's execute: method must be overridden!")
+        print("HTEventPlugin's execute: method must be overridden!")
         #endif
         return event
     }
@@ -48,7 +48,7 @@ public class ObjCEventPlugin: NSObject, EventPlugin, ObjCPlugin {
     }
 }
 
-@objc(SEGBlockPlugin)
+@objc(HTBlockPlugin)
 public class ObjCBlockPlugin: ObjCEventPlugin {
     let block: (ObjCRawEvent?) -> ObjCRawEvent?
     

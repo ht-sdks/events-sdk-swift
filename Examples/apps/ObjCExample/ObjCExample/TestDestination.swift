@@ -8,7 +8,7 @@
 import Foundation
 import Hightouch
 
-@objc(SEGTestDestination)
+@objc(HTTestDestination)
 public class ObjCTestDestination: NSObject, ObjCPlugin, ObjCPluginShim {
     public func instance() -> EventPlugin { return TestDestination() }
 }

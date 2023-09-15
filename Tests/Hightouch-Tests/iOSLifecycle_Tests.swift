@@ -14,7 +14,7 @@ final class iOSLifecycle_Tests: XCTestCase {
         
         waitUntilStarted(analytics: analytics)
         
-        UserDefaults.standard.setValue(nil, forKey: "SEGBuildKeyV2")
+        UserDefaults.standard.setValue(nil, forKey: "HTBuildKeyV2")
         
         // This is a hack that needs to be dealt with
         RunLoop.current.run(until: Date(timeIntervalSinceNow: 2))
@@ -36,7 +36,7 @@ final class iOSLifecycle_Tests: XCTestCase {
         
         waitUntilStarted(analytics: analytics)
         
-        UserDefaults.standard.setValue("1337", forKey: "SEGBuildKeyV2")
+        UserDefaults.standard.setValue("1337", forKey: "HTBuildKeyV2")
         
         // This is a hack that needs to be dealt with
         RunLoop.current.run(until: Date(timeIntervalSinceNow: 2))

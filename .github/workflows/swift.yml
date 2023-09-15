@@ -73,10 +73,10 @@ jobs:
         run: |
           cd Examples/apps/BasicExample
           xcodebuild -workspace "BasicExample.xcworkspace" -scheme "BasicExample" -sdk iphonesimulator
-      # - name: build for ios simulator
-      #   run: |
-      #     cd Examples/apps/ObjCExample
-      #     xcodebuild -workspace "ObjCExample.xcworkspace" -scheme "ObjCExample" -sdk iphonesimulator
+      - name: build for ios simulator
+        run: |
+          cd Examples/apps/ObjCExample
+          xcodebuild -workspace "ObjCExample.xcworkspace" -scheme "ObjCExample" -sdk iphonesimulator
       - name: build for ios simulator
         run: |
           cd Examples/apps/SegmentUIKitExample

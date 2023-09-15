@@ -12,8 +12,8 @@ import Foundation
 import UIKit
 
 class iOSLifecycleEvents: PlatformPlugin, iOSLifecycle {
-    static var versionKey = "SEGVersionKey"
-    static var buildKey = "SEGBuildKeyV2"
+    static var versionKey = "HTVersionKey"
+    static var buildKey = "HTBuildKeyV2"
     
     let type = PluginType.before
     weak var analytics: Analytics?
