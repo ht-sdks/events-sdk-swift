@@ -42,7 +42,7 @@ public class SegmentDestination: DestinationPlugin, Subscriber {
     
     internal var httpClient: HTTPClient?
     private var uploads = [UploadTaskInfo]()
-    private let uploadsQueue = DispatchQueue(label: "uploadsQueue.segment.com")
+    private let uploadsQueue = DispatchQueue(label: "uploadsQueue.hightouch.com")
     private var storage: Storage?
     
     @Atomic internal var eventCount: Int = 0
