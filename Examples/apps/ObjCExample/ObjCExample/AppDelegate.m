@@ -20,23 +20,23 @@
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
     // Override point for customization after application launch.
-    SEGConfiguration *config = [[SEGConfiguration alloc] initWithWriteKey:@"<WRITE KEY>"];
+    HTConfiguration *config = [[HTConfiguration alloc] initWithWriteKey:@"<WRITE KEY>"];
     config.trackApplicationLifecycleEvents = YES;
     config.flushAt = 1;
     
-    _analytics = [[SEGAnalytics alloc] initWithConfiguration: config];
+    _analytics = [[HTAnalytics alloc] initWithConfiguration: config];
     
     [self.analytics track:@"test"];
     [self.analytics track:@"testProps" properties:@{@"email": @"blah@blah.com"}];
     
     [self.analytics flush];
     
-    SEGTestDestination *testDestination = [[SEGTestDestination alloc] init];
+    HTTestDestination *testDestination = [[HTTestDestination alloc] init];
     [self.analytics addPlugin:testDestination];
     
-    SEGBlockPlugin *customizeAllTrackCalls = [[SEGBlockPlugin alloc] initWithBlock:^id<SEGRawEvent> _Nullable(id<SEGRawEvent> _Nullable event) {
-        if ([event isKindOfClass: [SEGTrackEvent class]]) {
-            SEGTrackEvent *track = (SEGTrackEvent *)event;
+    HTBlockPlugin *customizeAllTrackCalls = [[HTBlockPlugin alloc] initWithBlock:^id<HTRawEvent> _Nullable(id<HTRawEvent> _Nullable event) {
+        if ([event isKindOfClass: [HTTrackEvent class]]) {
+            HTTrackEvent *track = (HTTrackEvent *)event;
             // change the name
             NSString *newName = [NSString stringWithFormat: @"[New] %@", track.event];
             track.event = newName;
@@ -52,9 +52,9 @@
     
     [self.analytics addPlugin:customizeAllTrackCalls];
     
-    SEGBlockPlugin *booyaAllTrackCalls = [[SEGBlockPlugin alloc] initWithBlock:^id<SEGRawEvent> _Nullable(id<SEGRawEvent> _Nullable event) {
-        if ([event isKindOfClass: [SEGTrackEvent class]]) {
-            SEGTrackEvent *track = (SEGTrackEvent *)event;
+    HTBlockPlugin *booyaAllTrackCalls = [[HTBlockPlugin alloc] initWithBlock:^id<HTRawEvent> _Nullable(id<HTRawEvent> _Nullable event) {
+        if ([event isKindOfClass: [HTTrackEvent class]]) {
+            HTTrackEvent *track = (HTTrackEvent *)event;
             // change the name
             NSString *newName = [NSString stringWithFormat: @"[Booya] %@", track.event];
             track.event = newName;

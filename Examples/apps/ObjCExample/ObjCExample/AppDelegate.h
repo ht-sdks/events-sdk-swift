@@ -10,7 +10,7 @@
 
 @interface AppDelegate : UIResponder <UIApplicationDelegate>
 
-@property (nonatomic, retain, nullable) SEGAnalytics *analytics;
+@property (nonatomic, retain, nullable) HTAnalytics *analytics;
 
 @end
 

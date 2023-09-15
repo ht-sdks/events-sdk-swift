@@ -17,11 +17,11 @@ extension Analytics {
         var string: String {
             switch self {
             case .error:
-                return "SEG_ERROR: "
+                return "HT_ERROR: "
             case .warning:
-                return "SEG_WARNING: "
+                return "HT_WARNING: "
             case .debug:
-                return "SEG_DEBUG: "
+                return "HT_DEBUG: "
             case .none:
                 return ""
             }

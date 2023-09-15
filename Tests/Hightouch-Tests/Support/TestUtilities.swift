@@ -63,7 +63,7 @@ class ZiggyPlugin: EventPlugin {
 
 #if !os(Linux)
 
-@objc(SEGMyDestination)
+@objc(HTMyDestination)
 public class ObjCMyDestination: NSObject, ObjCPlugin, ObjCPluginShim {
     public func instance() -> EventPlugin { return MyDestination() }
 }

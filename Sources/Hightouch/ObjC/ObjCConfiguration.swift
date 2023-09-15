@@ -9,7 +9,7 @@
 
 import Foundation
 
-@objc(SEGConfiguration)
+@objc(HTConfiguration)
 public class ObjCConfiguration: NSObject {
     internal var configuration: Configuration
     
