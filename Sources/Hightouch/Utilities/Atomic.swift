@@ -19,7 +19,7 @@ import Foundation
 @propertyWrapper
 public class Atomic<T> {
     private var value: T
-    private let queue = DispatchQueue(label: "com.segment.atomic.\(UUID().uuidString)")
+    private let queue = DispatchQueue(label: "com.hightouch.atomic.\(UUID().uuidString)")
 
     public init(wrappedValue value: T) {
         self.value = value

@@ -15,7 +15,7 @@ internal class Storage: Subscriber {
 
     // This queue synchronizes reads/writes.
     // Do NOT use it outside of: write, read, reset, remove.
-    let syncQueue = DispatchQueue(label: "sync.segment.com")
+    let syncQueue = DispatchQueue(label: "sync.hightouch.com")
 
     private var outputStream: OutputFileStream? = nil
     
@@ -24,7 +24,7 @@ internal class Storage: Subscriber {
     
     init(store: Store, writeKey: String) {
         self.writeKey = writeKey
-        self.userDefaults = UserDefaults(suiteName: "com.segment.storage.\(writeKey)")
+        self.userDefaults = UserDefaults(suiteName: "com.hightouch.storage.\(writeKey)")
         store.subscribe(self) { [weak self] (state: UserInfo) in
             self?.userInfoUpdate(state: state)
         }
@@ -103,7 +103,7 @@ internal class Storage: Subscriber {
     }
     
     static func hardSettingsReset(writeKey: String) {
-        guard let defaults = UserDefaults(suiteName: "com.segment.storage.\(writeKey)") else { return }
+        guard let defaults = UserDefaults(suiteName: "com.hightouch.storage.\(writeKey)") else { return }
         defaults.removeObject(forKey: Constants.anonymousId.rawValue)
         defaults.removeObject(forKey: Constants.settings.rawValue)
         print(Array(defaults.dictionaryRepresentation().keys).count)
@@ -166,11 +166,11 @@ extension Storage {
     private static let tempExtension = "temp"
     
     enum Constants: String, CaseIterable {
-        case userId = "segment.userId"
-        case traits = "segment.traits"
-        case anonymousId = "segment.anonymousId"
-        case settings = "segment.settings"
-        case events = "segment.events"
+        case userId = "hightouch.userId"
+        case traits = "hightouch.traits"
+        case anonymousId = "hightouch.anonymousId"
+        case settings = "hightouch.settings"
+        case events = "hightouch.events"
     }
 }
 
@@ -212,7 +212,7 @@ extension Storage {
         
         let urls = FileManager.default.urls(for: searchPathDirectory, in: .userDomainMask)
         let docURL = urls[0]
-        let segmentURL = docURL.appendingPathComponent("segment/\(writeKey)/")
+        let segmentURL = docURL.appendingPathComponent("hightouch/\(writeKey)/")
         // try to create it, will fail if already exists, nbd.
         // tvOS, watchOS regularly clear out data.
         try? FileManager.default.createDirectory(at: segmentURL, withIntermediateDirectories: true, attributes: nil)
@@ -221,7 +221,7 @@ extension Storage {
     
     private func eventsFile(index: Int) -> URL {
         let docs = eventStorageDirectory()
-        let fileURL = docs.appendingPathComponent("\(index)-segment-events")
+        let fileURL = docs.appendingPathComponent("\(index)-hightouch-events")
         return fileURL
     }
     

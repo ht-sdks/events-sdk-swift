@@ -23,7 +23,7 @@ public class StartupQueue: Plugin, Subscriber {
         }
     }
     
-    let syncQueue = DispatchQueue(label: "startupQueue.segment.com")
+    let syncQueue = DispatchQueue(label: "startupQueue.hightouch.com")
     var queuedEvents = [RawEvent]()
     
     required init() { }

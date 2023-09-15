@@ -43,7 +43,7 @@ public extension macOSLifecycle {
 }
 
 class macOSLifecycleMonitor: PlatformPlugin {
-    static var specificName = "Segment_macOSLifecycleMonitor"
+    static var specificName = "Hightouch_macOSLifecycleMonitor"
     let type = PluginType.utility
     let name = specificName
     weak var analytics: Analytics?
