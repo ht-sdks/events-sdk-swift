@@ -155,10 +155,17 @@ extension UserInfo {
     static func defaultState(from storage: Storage) -> UserInfo {
         let userId: String? = storage.read(.userId)
         let traits: JSON? = storage.read(.traits)
+
+        // migrate external anonymous ids to hightouch
         var anonymousId: String = UUID().uuidString
-        if let existingId: String = storage.read(.anonymousId) {
-            anonymousId = existingId
+        if let existingAnonId: String = storage.read(.anonymousId) {
+            anonymousId = existingAnonId
+        } else if let segmentAnonId: String = storage.read(.anonymousIdSegment) {
+            anonymousId = segmentAnonId
+        } else if let rudderAnonId: String = storage.read(.anonymousIdRudder) {
+            anonymousId = rudderAnonId
         }
+
         return UserInfo(anonymousId: anonymousId, userId: userId, traits: traits, referrer: nil)
     }
 }

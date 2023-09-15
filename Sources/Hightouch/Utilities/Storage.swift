@@ -169,6 +169,8 @@ extension Storage {
         case userId = "hightouch.userId"
         case traits = "hightouch.traits"
         case anonymousId = "hightouch.anonymousId"
+        case anonymousIdSegment = "segment.anonymousId"
+        case anonymousIdRudder = "rl_anonymous_id"
         case settings = "hightouch.settings"
         case events = "hightouch.events"
     }
