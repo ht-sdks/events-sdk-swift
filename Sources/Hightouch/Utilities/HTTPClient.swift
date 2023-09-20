@@ -18,8 +18,8 @@ enum HTTPClientErrors: Error {
 }
 
 public class HTTPClient {
-    private static let defaultAPIHost = "events.us-east-1.hightouch.com/v1"
-    private static let defaultCDNHost = "events.us-east-1.hightouch.com/v1"
+    private static let defaultAPIHost = "us-east-1.hightouch-events.com/v1"
+    private static let defaultCDNHost = "us-east-1.hightouch-events.com/v1"
     
     internal var session: URLSession
     private var apiHost: String
