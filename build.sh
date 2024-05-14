@@ -18,9 +18,11 @@ rm Hightouch.zip
 rm Sovran.zip
 rm Hightouch.sha256
 rm Sovran.sha256
+rm JSONSafeEncoder.zip
+rm JSONSafeEncoder.sha256
 
 echo "Building XCFrameworks ..."
 
-swift create-xcframework --clean --platform ios --platform macos --platform maccatalyst --platform tvos --platform watchos --stack-evolution --zip Hightouch Sovran
+swift create-xcframework --clean --platform ios --platform macos --platform maccatalyst --platform tvos --platform watchos --stack-evolution --zip Hightouch Sovran JSONSafeEncoder
 
 echo "Done."
