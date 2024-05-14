@@ -149,7 +149,7 @@ public class SegmentDestination: DestinationPlugin, Subscriber, FlushCompletion 
 
                         // we don't want to retry events in a given batch when a 400
                         // response for malformed JSON is returned
-                        case .failure(Segment.HTTPClientErrors.statusCode(code: 400)):
+                        case .failure(Hightouch.HTTPClientErrors.statusCode(code: 400)):
                             storage.remove(file: url)
                             self.cleanupUploads()
                         default:
