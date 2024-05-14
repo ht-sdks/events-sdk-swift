@@ -1,7 +1,7 @@
 import XCTest
 @testable import Hightouch
 
-#if os(iOS)
+#if os(iOS) || os(tvOS) || os(visionOS)
 final class iOSLifecycle_Tests: XCTestCase {
     
     func testInstallEventCreation() {
