@@ -57,7 +57,7 @@ final class Analytics_Tests: XCTestCase {
     
     func testDestinationInitialUpdateOnlyOnce() {
         // need to clear settings for this one.
-        UserDefaults.standard.removePersistentDomain(forName: "com.segment.storage.test")
+        UserDefaults.standard.removePersistentDomain(forName: "com.hightouch.storage.test")
 
         let expectation = XCTestExpectation(description: "MyDestination Expectation")
         let myDestination = MyDestination {

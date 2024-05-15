@@ -22,9 +22,9 @@ internal class Storage: Subscriber {
     init(store: Store, writeKey: String, storageMode: StorageMode, operatingMode: OperatingMode) {
         self.writeKey = writeKey
         self.storageMode = storageMode
-        self.userDefaults = UserDefaults(suiteName: "com.segment.storage.\(writeKey)")!
+        self.userDefaults = UserDefaults(suiteName: "com.hightouch.storage.\(writeKey)")!
 
-        var storageURL = Segment.eventStorageDirectory(writeKey: writeKey)
+        var storageURL = Hightouch.eventStorageDirectory(writeKey: writeKey)
         let asyncAppend = (operatingMode == .asynchronous)
         switch storageMode {
         case .diskAtURL(let url):
@@ -35,7 +35,7 @@ internal class Storage: Subscriber {
                 configuration: DirectoryStore.Configuration(
                     writeKey: writeKey,
                     storageLocation: storageURL,
-                    baseFilename: "segment-events",
+                    baseFilename: "hightouch-events",
                     maxFileSize: Self.MAXFILESIZE,
                     indexKey: Storage.Constants.events.rawValue))
             self.dataStore = TransientDB(store: store, asyncAppend: asyncAppend)
@@ -120,7 +120,7 @@ internal class Storage: Subscriber {
     }
 
     static func hardSettingsReset(writeKey: String) {
-        guard let defaults = UserDefaults(suiteName: "com.segment.storage.\(writeKey)") else { return }
+        guard let defaults = UserDefaults(suiteName: "com.hightouch.storage.\(writeKey)") else { return }
         for key in Constants.allCases {
             defaults.removeObject(forKey: key.rawValue)
         }
@@ -129,7 +129,7 @@ internal class Storage: Subscriber {
     func hardReset(doYouKnowHowToUseThis: Bool) {
         if doYouKnowHowToUseThis != true { return }
         dataStore.reset()
-        guard let defaults = UserDefaults(suiteName: "com.segment.storage.\(writeKey)") else { return }
+        guard let defaults = UserDefaults(suiteName: "com.hightouch.storage.\(writeKey)") else { return }
         for key in Constants.allCases {
             defaults.removeObject(forKey: key.rawValue)
         }
@@ -171,11 +171,13 @@ extension Storage {
     private static let tempExtension = "temp"
 
     enum Constants: String, CaseIterable {
-        case userId = "segment.userId"
-        case traits = "segment.traits"
-        case anonymousId = "segment.anonymousId"
-        case settings = "segment.settings"
-        case events = "segment.events"
+        case userId = "hightouch.userId"
+        case traits = "hightouch.traits"
+        case anonymousId = "hightouch.anonymousId"
+        case anonymousIdSegment = "segment.anonymousId"
+        case anonymousIdRudder = "rl_anonymous_id"
+        case settings = "hightouch.settings"
+        case events = "hightouch.events"
     }
 }
 

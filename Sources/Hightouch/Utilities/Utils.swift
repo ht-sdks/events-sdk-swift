@@ -78,7 +78,7 @@ internal func eventStorageDirectory(writeKey: String) -> URL {
 
     let urls = FileManager.default.urls(for: searchPathDirectory, in: .userDomainMask)
     let docURL = urls[0]
-    let segmentURL = docURL.appendingPathComponent("segment/\(writeKey)/")
+    let segmentURL = docURL.appendingPathComponent("hightouch/\(writeKey)/")
     // try to create it, will fail if already exists, nbd.
     // tvOS, watchOS regularly clear out data.
     try? FileManager.default.createDirectory(at: segmentURL, withIntermediateDirectories: true, attributes: nil)

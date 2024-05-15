@@ -19,7 +19,7 @@ public enum OperatingMode {
     /// The operation of the Analytics client are asynchronous.
     case asynchronous
 
-    static internal let defaultQueue = DispatchQueue(label: "com.segment.operatingModeQueue", qos: .utility)
+    static internal let defaultQueue = DispatchQueue(label: "com.hightouch.operatingModeQueue", qos: .utility)
 }
 
 // MARK: - Storage Mode
