@@ -4,10 +4,10 @@ This file provides instructions for AI agents working on this Swift SDK.
 
 ## Project Overview
 
-- **Language**: Swift (5.7+)
+- **Language**: Swift (swift-tools-version 5.7+)
 - **Package Manager**: Swift Package Manager (SPM)
 - **Testing**: XCTest
-- **CI**: GitHub Actions (Xcode 15.2 on macOS 14, Swift 5.7.2 on Linux)
+- **CI**: GitHub Actions (Xcode 15.2 on macOS 14, Swift 5.7.2+ on Linux)
 - **State Management**: [Sovran-Swift](https://github.com/segmentio/Sovran-Swift.git) (from 1.1.0)
 - **Product**: `Hightouch` — the Hightouch Events SDK for Apple platforms and Linux
 
@@ -19,7 +19,7 @@ This file provides instructions for AI agents working on this Swift SDK.
 | iOS      | 13.0           |
 | tvOS     | 11.0           |
 | watchOS  | 7.1            |
-| Linux    | (Swift 5.7.2)  |
+| Linux    | (Swift 5.7.2+) |
 
 ### Project Structure
 
@@ -71,15 +71,15 @@ Sources/
 
 Tests/
   Hightouch-Tests/
-    Analytics_Tests.swift         # Core analytics tests
+    Analytics_Tests.swift         # Core analytics tests (24 tests)
     HTTPClient_Tests.swift        # HTTP client tests
-    JSON_Tests.swift              # JSON utility tests
-    KeyPath_Tests.swift           # KeyPath tests
-    Storage_Tests.swift           # Storage tests
-    FlushPolicy_Tests.swift       # Flush policy tests
-    Timeline_Tests.swift          # Timeline/plugin chain tests
+    JSON_Tests.swift              # JSON utility tests (10 tests)
+    KeyPath_Tests.swift           # KeyPath tests (5 tests)
+    Storage_Tests.swift           # Storage tests (4 tests)
+    FlushPolicy_Tests.swift       # Flush policy tests (5 tests)
+    Timeline_Tests.swift          # Timeline/plugin chain tests (3 tests)
     iOSLifecycle_Tests.swift      # iOS lifecycle tests
-    MemoryLeak_Tests.swift        # Memory leak detection tests
+    MemoryLeak_Tests.swift        # Memory leak detection tests (2 tests)
     StressTests.swift             # Concurrency stress tests
     ObjC_Tests.swift              # Objective-C compatibility tests
     Support/
@@ -101,6 +101,190 @@ Examples/
 | [Sovran-Swift](https://github.com/segmentio/Sovran-Swift.git) (>=1.1.0) | Lightweight state management (Store, State, Action, Subscriber) |
 
 No other external dependencies. The SDK is intentionally lightweight.
+
+---
+
+## Updating Dependencies
+
+### 1. Pre-flight Checks
+
+```bash
+# Check Swift version (minimum 5.7 required, see Package.swift swift-tools-version)
+swift --version
+
+# Ensure you're at the repository root
+pwd  # Should be: /path/to/events-sdk-swift
+```
+
+**On Linux**, if Swift is not installed, download and install it:
+
+```bash
+# Download Swift for your Ubuntu version (example for Ubuntu 24.04)
+curl -sL -o /tmp/swift.tar.gz \
+  "https://download.swift.org/swift-5.10.1-release/ubuntu2404/swift-5.10.1-RELEASE/swift-5.10.1-RELEASE-ubuntu24.04.tar.gz"
+
+# Extract to a local directory
+mkdir -p ~/swift-toolchain
+tar -xzf /tmp/swift.tar.gz -C ~/swift-toolchain
+
+# Add to PATH
+export PATH="$HOME/swift-toolchain/swift-5.10.1-RELEASE-ubuntu24.04/usr/bin:$PATH"
+
+# Install required system libraries if missing
+sudo apt-get install -y libncurses6 libcurl4 libxml2
+
+# Verify
+swift --version
+```
+
+### 2. Establish Test Baseline
+
+```bash
+# Resolve and fetch dependencies
+swift package resolve
+
+# Build the package
+swift build
+
+# Run all tests
+swift test
+
+# On Linux, use test discovery:
+swift test --enable-test-discovery
+```
+
+Record the number of passing tests before making any changes. As of the current codebase, the Linux test suite runs **53 tests with 0 failures**. This ensures you can verify nothing broke after upgrading.
+
+### 3. Check Current Dependency Versions
+
+```bash
+# Show the dependency tree and resolved versions
+swift package show-dependencies
+```
+
+This currently shows:
+
+```
+.
+└── sovran-swift<https://github.com/segmentio/Sovran-Swift.git@1.1.0>
+```
+
+### 4. Check for Available Updates
+
+```bash
+# Dry-run update to see what would change without actually updating
+swift package update --dry-run
+```
+
+This shows which dependencies have newer versions available within their semver constraints. Example output:
+
+```
+1 dependency has changed:
+~ sovran-swift 1.1.0 -> sovran-swift 1.1.2
+```
+
+### 5. Upgrade Dependencies
+
+#### Option A: Safe Updates (within semver range)
+
+```bash
+# Update all dependencies to latest within their semver constraints
+swift package update
+```
+
+This modifies `Package.resolved` but not `Package.swift`. The update is bounded by the version requirement in `Package.swift` (currently `from: "1.1.0"` for Sovran-Swift, meaning any `1.x.y >= 1.1.0`).
+
+#### Option B: Major/Breaking Version Updates
+
+For updates beyond the current semver range, edit `Package.swift` directly:
+
+```swift
+// Change the version requirement
+.package(url: "https://github.com/segmentio/Sovran-Swift.git", from: "2.0.0")
+```
+
+Then re-resolve:
+
+```bash
+# Clean and re-resolve
+swift package reset
+swift package resolve
+```
+
+#### Option C: Pin to a Specific Version
+
+```bash
+# Resolve a specific package to an exact version
+swift package resolve sovran-swift --version 1.1.2
+```
+
+### 6. Rebuild and Test
+
+```bash
+# Clean build artifacts (recommended after dependency changes)
+swift package clean
+
+# Rebuild
+swift build
+
+# Run all tests
+swift test                           # macOS
+swift test --enable-test-discovery   # Linux
+
+# Run a specific test class
+swift test --filter Analytics_Tests
+
+# Run a specific test method
+swift test --filter Analytics_Tests/testTrack
+```
+
+Compare test results to baseline (**53 tests, 0 failures** on Linux). Fix any failures before proceeding.
+
+### 7. Verify CI Would Pass
+
+The CI runs on two platforms. To replicate locally:
+
+**macOS (via SPM):**
+
+```bash
+swift build
+swift test
+```
+
+**macOS (via xcodebuild for specific simulators):**
+
+```bash
+# iOS Simulator
+xcodebuild -scheme Hightouch test -sdk iphonesimulator \
+  -destination 'platform=iOS Simulator,name=iPhone 15'
+
+# tvOS Simulator
+xcodebuild -scheme Hightouch test -sdk appletvsimulator \
+  -destination 'platform=tvOS Simulator,name=Apple TV'
+
+# watchOS Simulator
+xcodebuild -scheme Hightouch test -sdk watchsimulator \
+  -destination 'platform=watchOS Simulator,name=Apple Watch Series 9 (45mm)'
+```
+
+**Linux:**
+
+```bash
+swift build
+swift test --enable-test-discovery
+```
+
+### 8. Commit the Update
+
+After verifying all tests pass:
+
+```bash
+# Package.resolved is gitignored in this repo, so there is nothing
+# extra to commit unless you changed Package.swift itself.
+# If you edited Package.swift:
+git add Package.swift
+git commit -m "Update Sovran-Swift dependency to X.Y.Z"
+```
 
 ---
 
@@ -147,12 +331,12 @@ Plugin (base protocol)
 ### Prerequisites
 
 - **macOS**: Xcode 15.2+ (for full platform testing)
-- **Linux**: Swift 5.7.2+
+- **Linux**: Swift 5.7+ (5.10.1 recommended; see Pre-flight Checks above for install instructions)
+- **Linux system libraries**: `libncurses6`, `libcurl4`, `libxml2`
 
 ### Build
 
 ```bash
-# Build the package
 swift build
 ```
 
@@ -166,20 +350,23 @@ swift test
 swift test --enable-test-discovery
 ```
 
-### Test via Xcode (for specific platform simulators)
+### Run Tests for Specific Platform Simulators (macOS only)
 
 ```bash
 # iOS Simulator
-xcodebuild -scheme Hightouch test -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 15'
+xcodebuild -scheme Hightouch test -sdk iphonesimulator \
+  -destination 'platform=iOS Simulator,name=iPhone 15'
 
 # tvOS Simulator
-xcodebuild -scheme Hightouch test -sdk appletvsimulator -destination 'platform=tvOS Simulator,name=Apple TV'
+xcodebuild -scheme Hightouch test -sdk appletvsimulator \
+  -destination 'platform=tvOS Simulator,name=Apple TV'
 
 # watchOS Simulator
-xcodebuild -scheme Hightouch test -sdk watchsimulator -destination 'platform=watchOS Simulator,name=Apple Watch Series 9 (45mm)'
+xcodebuild -scheme Hightouch test -sdk watchsimulator \
+  -destination 'platform=watchOS Simulator,name=Apple Watch Series 9 (45mm)'
 ```
 
-### Build Example Apps
+### Build Example Apps (macOS only)
 
 ```bash
 cd Examples/apps/BasicExample
@@ -187,6 +374,30 @@ xcodebuild -workspace "BasicExample.xcworkspace" -scheme "BasicExample" -sdk iph
 
 cd Examples/apps/ObjCExample
 xcodebuild -workspace "ObjCExample.xcworkspace" -scheme "ObjCExample" -sdk iphonesimulator
+
+cd Examples/apps/SegmentUIKitExample
+xcodebuild -workspace "SegmentUIKitExample.xcworkspace" -scheme "SegmentUIKitExample" -sdk iphonesimulator
+
+cd Examples/apps/SegmentWeatherWidget
+xcodebuild -workspace "SegmentWeatherWidget.xcworkspace" -scheme "SegmentWeatherWidget" -sdk iphonesimulator
+
+# Mac Catalyst
+cd Examples/apps/SegmentUIKitExample
+xcodebuild -workspace "SegmentUIKitExample.xcworkspace" -scheme "SegmentUIKitExample" \
+  -destination 'platform=macOS,variant=Mac Catalyst'
+```
+
+### Run a Single Test
+
+```bash
+# Run a specific test class
+swift test --filter Analytics_Tests
+
+# Run a specific test method
+swift test --filter Analytics_Tests/testTrack
+
+# Run tests matching a pattern
+swift test --filter testFlush
 ```
 
 ---
@@ -205,6 +416,12 @@ Runs on push/PR to `main`. Jobs:
 | `build_and_test_tvos` | macOS 14, Xcode 15.2 | `xcodebuild test` on Apple TV simulator |
 | `build_and_test_watchos` | macOS 14, Xcode 15.2 | `xcodebuild test` on Apple Watch Series 9 simulator |
 | `build_and_test_examples` | macOS 14, Xcode 15.2 | Builds BasicExample, ObjCExample, UIKitExample, WeatherWidget, Mac Catalyst |
+
+### Known CI Issues
+
+**Linux job (`build_and_test_spm_linux`)**: The CI uses `sersoft-gmbh/swifty-linux-action@v3` to install Swift 5.7.2. When GitHub Actions updates its `ubuntu-latest` runner to a newer Ubuntu version (e.g., 24.04), Swift 5.7.2 may not have a release for that platform, causing a 404 download error. The fix is to update the `release-version` in `.github/workflows/swift.yml` to a Swift version that supports the current Ubuntu runner (e.g., 5.10.1 for Ubuntu 24.04).
+
+**iOS job (`build_and_test_ios`)**: Occasionally fails with `Failed to create a bundle instance` errors. This is typically an Xcode/simulator infrastructure flake in CI, not a code issue.
 
 ### Release Workflow (`.github/workflows/tagged-release.yml`)
 
@@ -246,35 +463,13 @@ This version string is used in:
 - HTTP `User-Agent` header: `analytics-ios/<version>`
 - Context payload: `library.version`
 
----
+### Semantic Versioning
 
-## Updating Dependencies
+- **PATCH** (0.0.6 → 0.0.7): Bug fixes, dependency updates, no new features
+- **MINOR** (0.0.6 → 0.1.0): New backwards-compatible features
+- **MAJOR** (0.0.6 → 1.0.0): Breaking API changes
 
-### Check Current Dependencies
-
-Dependencies are declared in `Package.swift`. Currently the only external dependency is Sovran-Swift (>=1.1.0).
-
-The resolved versions are tracked in `Package.resolved` (gitignored — regenerated on build).
-
-### Update Sovran-Swift
-
-To update to the latest compatible version:
-
-```bash
-swift package update
-```
-
-To change the version requirement, edit `Package.swift`:
-
-```swift
-.package(url: "https://github.com/segmentio/Sovran-Swift.git", from: "1.1.0")
-```
-
-Then rebuild and test:
-
-```bash
-swift build && swift test
-```
+The version follows `BREAKING.FEATURE.FIX` format as noted in `Version.swift`.
 
 ---
 
@@ -313,14 +508,6 @@ The codebase uses extensive `#if os(...)` conditionals:
 - `#if os(Linux)` — `FoundationNetworking` import, no lifecycle events yet
 - `#if !os(Linux)` — ObjC compatibility, URL protocol mocks in tests
 
-### Testing Patterns
-
-- **`OutputReaderPlugin`**: An `.after` plugin that captures the last event for assertions. Defined in `Tests/Hightouch-Tests/Support/TestUtilities.swift`.
-- **`waitUntilStarted(analytics:)`**: Spins the run loop until the `StartupQueue` reports `running == true`. Required before asserting on events.
-- **`hardReset(doYouKnowHowToUseThis:)`**: Clears all stored events and user defaults for a given write key. Used in tests that need a clean slate.
-- **Write key isolation**: Tests that interact with storage should use unique write keys to avoid collisions with other tests.
-- **Linux test discovery**: Tests on Linux require `--enable-test-discovery` flag and `XCTestManifests.swift` / `LinuxMain.swift`.
-
 ### Default API Hosts
 
 ```swift
@@ -329,6 +516,14 @@ The codebase uses extensive `#if os(...)` conditionals:
 ```
 
 Configurable via `Configuration.apiHost(_:)` and `Configuration.cdnHost(_:)`.
+
+### Testing Patterns
+
+- **`OutputReaderPlugin`**: An `.after` plugin that captures the last event for assertions. Defined in `Tests/Hightouch-Tests/Support/TestUtilities.swift`.
+- **`waitUntilStarted(analytics:)`**: Spins the run loop until the `StartupQueue` reports `running == true`. Required before asserting on events.
+- **`hardReset(doYouKnowHowToUseThis:)`**: Clears all stored events and user defaults for a given write key. Used in tests that need a clean slate.
+- **Write key isolation**: Tests that interact with storage should use unique write keys to avoid collisions with other tests.
+- **Linux test discovery**: Tests on Linux require `--enable-test-discovery` flag. `LinuxMain.swift` and `XCTestManifests.swift` exist but are ignored when test discovery is enabled.
 
 ---
 
@@ -385,16 +580,6 @@ func testMyFeature() {
 }
 ```
 
-### Running a Single Test
-
-```bash
-# Run a specific test class
-swift test --filter Analytics_Tests
-
-# Run a specific test method
-swift test --filter Analytics_Tests/testTrack
-```
-
 ---
 
 ## Important Files Reference
@@ -417,13 +602,22 @@ swift test --filter Analytics_Tests/testTrack
 
 ---
 
-## Semantic Versioning
+## Quick Reference
 
-- **PATCH** (0.0.6 → 0.0.7): Bug fixes, dependency updates, no new features
-- **MINOR** (0.0.6 → 0.1.0): New backwards-compatible features
-- **MAJOR** (0.0.6 → 1.0.0): Breaking API changes
-
-The version follows `BREAKING.FEATURE.FIX` format as noted in `Version.swift`.
+| Task | Command |
+|------|---------|
+| Build | `swift build` |
+| Test (macOS) | `swift test` |
+| Test (Linux) | `swift test --enable-test-discovery` |
+| Test specific class | `swift test --filter Analytics_Tests` |
+| Test specific method | `swift test --filter Analytics_Tests/testTrack` |
+| Show dependencies | `swift package show-dependencies` |
+| Check for updates | `swift package update --dry-run` |
+| Update dependencies | `swift package update` |
+| Clean build | `swift package clean` |
+| Full clean + reset | `swift package reset` |
+| Resolve dependencies | `swift package resolve` |
+| iOS simulator test | `xcodebuild -scheme Hightouch test -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 15'` |
 
 ---
 
@@ -435,6 +629,46 @@ The version follows `BREAKING.FEATURE.FIX` format as noted in `Version.swift`.
 - ObjC interop (`@objc`, `NSObject`) is not available on Linux. All ObjC code is gated behind `#if !os(Linux)`.
 - `UserDefaults` on Linux: setting a key's value to `nil` causes a deadlock — use `removeObject(forKey:)` instead.
 - `XCTExpectFailure` is not available on Linux. Tests using it are gated with `#if !os(Linux)`.
+
+### Installing Swift on Linux
+
+Swift is not bundled with most Linux distributions. To install:
+
+```bash
+# Check your Ubuntu version
+lsb_release -sir
+
+# Download the appropriate Swift release (match Ubuntu version)
+# For Ubuntu 24.04:
+curl -sL -o /tmp/swift.tar.gz \
+  "https://download.swift.org/swift-5.10.1-release/ubuntu2404/swift-5.10.1-RELEASE/swift-5.10.1-RELEASE-ubuntu24.04.tar.gz"
+
+# For Ubuntu 22.04:
+curl -sL -o /tmp/swift.tar.gz \
+  "https://download.swift.org/swift-5.10.1-release/ubuntu2204/swift-5.10.1-RELEASE/swift-5.10.1-RELEASE-ubuntu22.04.tar.gz"
+
+# Extract and add to PATH
+mkdir -p ~/swift-toolchain
+tar -xzf /tmp/swift.tar.gz -C ~/swift-toolchain
+export PATH="$HOME/swift-toolchain/swift-5.10.1-RELEASE-ubuntu$(lsb_release -sr)/usr/bin:$PATH"
+
+# Install required system libraries
+sudo apt-get install -y libncurses6 libcurl4 libxml2
+```
+
+### CI Linux Failure: Swift Version Not Available for Ubuntu
+
+The CI uses `sersoft-gmbh/swifty-linux-action@v3` with `release-version: "5.7.2"`. When GitHub upgrades the `ubuntu-latest` runner, Swift 5.7.2 may not have a build for the new Ubuntu version (e.g., Swift 5.7.2 was never released for Ubuntu 24.04). Fix by updating `.github/workflows/swift.yml`:
+
+```yaml
+- uses: sersoft-gmbh/swifty-linux-action@v3
+  with:
+    release-version: "5.10.1"   # Use a version that supports the current ubuntu-latest
+```
+
+### CI iOS Failure: Bundle Instance Error
+
+The iOS test job may fail with `Failed to create a bundle instance`. This is typically a simulator infrastructure flake, not a code issue. Re-running the job usually resolves it.
 
 ### Test Isolation
 
