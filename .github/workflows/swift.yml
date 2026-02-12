@@ -17,7 +17,7 @@ jobs:
       - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: "15.4"
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Build
         run: swift build
       - name: Run tests
@@ -26,10 +26,10 @@ jobs:
   build_and_test_spm_linux:
     runs-on: ubuntu-latest
     steps:
-      - uses: sersoft-gmbh/swifty-linux-action@v3
+      - uses: swift-actions/setup-swift@v2
         with:
-          release-version: "5.10.1"
-      - uses: actions/checkout@v2
+          swift-version: "5.10.1"
+      - uses: actions/checkout@v4
       - name: Build
         run: swift build
       - name: Run tests
@@ -41,7 +41,7 @@ jobs:
       - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: "15.4"
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - run: xcodebuild -scheme Hightouch test -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 15'
 
   build_and_test_tvos:
@@ -50,7 +50,7 @@ jobs:
       - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: "15.4"
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - run: xcodebuild -scheme Hightouch test -sdk appletvsimulator -destination 'platform=tvOS Simulator,name=Apple TV'
 
   build_and_test_watchos:
@@ -59,7 +59,7 @@ jobs:
       - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: "15.4"
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - run: xcodebuild -scheme Hightouch test -sdk watchsimulator -destination 'platform=watchOS Simulator,name=Apple Watch Series 9 (45mm)'
 
   build_and_test_examples:
@@ -68,7 +68,7 @@ jobs:
       - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: "15.4"
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: build for ios simulator
         run: |
           cd Examples/apps/BasicExample
