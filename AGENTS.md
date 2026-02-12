@@ -206,10 +206,9 @@ swift test --enable-test-discovery
 After verifying all tests pass:
 
 ```bash
-# Package.resolved is gitignored in this repo, so there is nothing
-# extra to commit unless you changed Package.swift itself.
-# If you edited Package.swift:
-git add Package.swift
+# Package.resolved is tracked in this repo, so commit it along with
+# any Package.swift changes:
+git add Package.resolved Package.swift
 git commit -m "Update Sovran-Swift dependency to X.Y.Z"
 ```
 
