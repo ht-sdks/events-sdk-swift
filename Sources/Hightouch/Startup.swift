@@ -63,6 +63,10 @@ extension Analytics: Subscriber {
             //plugins.append(LinuxLifecycleMonitor())
             #endif
         }
+
+        if SessionPluginHelper.isEnabled(configuration.values) {
+            plugins.append(SessionPlugin())
+        }
         
         if plugins.isEmpty {
             return nil

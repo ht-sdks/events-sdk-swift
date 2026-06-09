@@ -31,6 +31,9 @@ internal class Storage: Subscriber {
         store.subscribe(self) { [weak self] (state: System) in
             self?.systemUpdate(state: state)
         }
+        store.subscribe(self) { [weak self] (state: SessionInfo) in
+            self?.sessionInfoUpdate(state: state)
+        }
     }
     
     func write<T: Codable>(_ key: Storage.Constants, value: T?) {
@@ -172,6 +175,7 @@ extension Storage {
         case anonymousIdSegment = "segment.anonymousId"
         case anonymousIdRudder = "rl_anonymous_id"
         case settings = "hightouch.settings"
+        case sessionState = "hightouch.sessionState"
         case events = "hightouch.events"
     }
 }
@@ -191,6 +195,10 @@ extension Storage {
         if let s = state.settings {
             write(.settings, value: s)
         }
+    }
+
+    internal func sessionInfoUpdate(state: SessionInfo) {
+        write(.sessionState, value: state.sessionState)
     }
 }
 
