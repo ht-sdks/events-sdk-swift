@@ -86,7 +86,9 @@ final class Session_Tests: XCTestCase {
         XCTAssertEqual(number(session?["sessionIndex"]), 1)
         XCTAssertEqual(session?["sessionStart"] as? Bool, true)
         XCTAssertEqual(number(session?["previousSessionId"]), 1000)
-        XCTAssertEqual(session?["firstEventId"] as? String, (output.events[0] as? TrackEvent)?.messageId)
+        let firstEventId = session?["firstEventId"] as? String
+        XCTAssertNotEqual(firstEventId, "")
+        XCTAssertEqual(firstEventId, (output.events[1] as? TrackEvent)?.messageId)
     }
 
     func testDoesNotEnrichWhenBothTimeoutsAreZero() {

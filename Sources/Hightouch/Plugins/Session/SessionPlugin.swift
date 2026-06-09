@@ -55,7 +55,7 @@ class SessionPlugin: PlatformPlugin, EventPlugin {
         updateSessionState { state in
             return SessionPluginHelper.rotateSession(state: state,
                                                      now: currentTime,
-                                                     firstEventId: state?.firstEventId ?? "",
+                                                     firstEventId: "",
                                                      firstEventTimestamp: Date(timeIntervalSince1970: TimeInterval(currentTime) / 1000).iso8601())
         }
     }
