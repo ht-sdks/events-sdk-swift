@@ -31,9 +31,6 @@ internal class Storage: Subscriber {
         store.subscribe(self) { [weak self] (state: System) in
             self?.systemUpdate(state: state)
         }
-        store.subscribe(self) { [weak self] (state: SessionInfo) in
-            self?.sessionInfoUpdate(state: state)
-        }
     }
     
     func write<T: Codable>(_ key: Storage.Constants, value: T?) {
@@ -197,9 +194,6 @@ extension Storage {
         }
     }
 
-    internal func sessionInfoUpdate(state: SessionInfo) {
-        write(.sessionState, value: state.sessionState)
-    }
 }
 
 // MARK: - Utility Methods

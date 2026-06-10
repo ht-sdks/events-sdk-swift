@@ -118,8 +118,9 @@ class SessionPlugin: PlatformPlugin, EventPlugin {
         guard let analytics = analytics else { return }
 
         analytics.store.dispatch(action: SessionInfo.UpdateSessionAction(update: update))
-        let sessionInfo: SessionInfo? = analytics.store.currentState()
-        analytics.storage.write(.sessionState, value: sessionInfo?.sessionState)
+        if let sessionInfo: SessionInfo = analytics.store.currentState() {
+            analytics.storage.write(.sessionState, value: sessionInfo.sessionState)
+        }
     }
 }
 
