@@ -103,6 +103,9 @@ public extension Configuration {
     /// - Returns: The current Configuration.
     @discardableResult
     func foregroundSessionTimeout(_ timeout: Int) -> Configuration {
+        guard SessionPluginHelper.isValidSessionTimeout(timeout) else {
+            fatalError("foregroundSessionTimeout must be greater than or equal to zero.")
+        }
         values.foregroundSessionTimeout = timeout
         return self
     }
@@ -114,6 +117,9 @@ public extension Configuration {
     /// - Returns: The current Configuration.
     @discardableResult
     func backgroundSessionTimeout(_ timeout: Int) -> Configuration {
+        guard SessionPluginHelper.isValidSessionTimeout(timeout) else {
+            fatalError("backgroundSessionTimeout must be greater than or equal to zero.")
+        }
         values.backgroundSessionTimeout = timeout
         return self
     }

@@ -149,6 +149,12 @@ final class SessionPluginHelper_Tests: XCTestCase {
         XCTAssertEqual(result.eventIndex, 0)
     }
 
+    func testRejectsNegativeSessionTimeouts() {
+        XCTAssertFalse(SessionPluginHelper.isValidSessionTimeout(-1))
+        XCTAssertTrue(SessionPluginHelper.isValidSessionTimeout(0))
+        XCTAssertTrue(SessionPluginHelper.isValidSessionTimeout(1_800_000))
+    }
+
     func testIsEnabledOnlyFalseWhenBothTimeoutsAreZero() {
         XCTAssertTrue(SessionPluginHelper.isEnabled(foregroundSessionTimeout: 1, backgroundSessionTimeout: 0))
         XCTAssertTrue(SessionPluginHelper.isEnabled(foregroundSessionTimeout: 0, backgroundSessionTimeout: 1))

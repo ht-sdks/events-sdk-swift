@@ -23,6 +23,10 @@ struct EnrichedSessionEvent: Equatable {
 }
 
 enum SessionPluginHelper {
+    static func isValidSessionTimeout(_ timeout: Int) -> Bool {
+        return timeout >= 0
+    }
+
     static func isEnabled(foregroundSessionTimeout: Int, backgroundSessionTimeout: Int) -> Bool {
         return !(foregroundSessionTimeout == 0 && backgroundSessionTimeout == 0)
     }
