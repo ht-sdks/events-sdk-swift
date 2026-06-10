@@ -263,6 +263,39 @@ final class Session_Tests: XCTestCase {
     }
     #endif
 
+    func testUploadsTrackedEventsWithSessionContext() throws {
+        let writeKey = "test-session-delivery"
+        resetStorage(writeKey: writeKey)
+        let analytics = Analytics(configuration: Configuration(writeKey: writeKey)
+            .trackApplicationLifecycleEvents(false)
+            .foregroundSessionTimeout(1_800_000)
+            .backgroundSessionTimeout(1_800_000))
+        let plugin = configuredSessionPlugin(from: analytics)
+
+        plugin.now = { 1000 }
+        waitUntilStarted(analytics: analytics)
+        analytics.track(name: "Purchase Completed")
+
+        guard let urls = analytics.storage.read(.events) as? [URL], let url = urls.first else {
+            XCTFail("Expected event batch file")
+            return
+        }
+
+        let json = try JSONSerialization.jsonObject(with: Data(contentsOf: url), options: []) as! [String: Any]
+        let batch = json["batch"] as! [[String: Any]]
+        let context = batch[0]["context"] as! [String: Any]
+        let session = context["session"] as! [String: Any]
+
+        XCTAssertEqual(number(context["sessionId"]), 1000)
+        XCTAssertEqual(context["sessionStart"] as? Bool, true)
+        XCTAssertEqual(number(session["sessionId"]), 1000)
+        XCTAssertEqual(number(session["sessionIndex"]), 0)
+        XCTAssertEqual(session["sessionStart"] as? Bool, true)
+        XCTAssertEqual(number(session["eventIndex"]), 0)
+        XCTAssertTrue(session["previousSessionId"] is NSNull)
+        XCTAssertNotNil(session["firstEventId"] as? String)
+    }
+
     private func makeAnalytics(writeKey suffix: String) -> Analytics {
         let writeKey = "test-\(suffix)"
         resetStorage(writeKey: writeKey)
