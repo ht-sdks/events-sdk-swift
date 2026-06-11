@@ -1,0 +1,5 @@
+// Copy this file to Config.xcconfig and fill in your values.
+// Config.xcconfig is gitignored and will not be committed.
+HIGHTOUCH_WRITE_KEY = YOUR_WRITE_KEY
+HIGHTOUCH_API_HOST = YOUR_API_HOST
+HIGHTOUCH_APP_ID = YOUR_APP_ID
