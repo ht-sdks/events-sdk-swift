@@ -113,6 +113,41 @@ final class SessionPluginHelper_Tests: XCTestCase {
                                       firstEventTimestamp: "2026-01-01T00:00:04.000Z"))
     }
 
+    func testPreservesBackgroundedAtWhenRebackgroundingWithPendingRotation() {
+        let backgroundedState = SessionState(sessionId: initialState.sessionId,
+                                             sessionIndex: initialState.sessionIndex,
+                                             previousSessionId: initialState.previousSessionId,
+                                             firstEventId: initialState.firstEventId,
+                                             firstEventTimestamp: initialState.firstEventTimestamp,
+                                             eventIndex: initialState.eventIndex,
+                                             lastActivityAt: initialState.lastActivityAt,
+                                             backgroundedAt: 1500)
+
+        let foregroundedState = SessionPluginHelper.markForegrounded(state: backgroundedState,
+                                                                     now: 4000,
+                                                                     backgroundSessionTimeout: 2000)
+        XCTAssertEqual(foregroundedState?.backgroundedAt, 1500)
+
+        let rebackgroundedState = SessionPluginHelper.markBackgrounded(state: foregroundedState, now: 5100)
+        XCTAssertEqual(rebackgroundedState?.backgroundedAt, 1500)
+
+        let result = SessionPluginHelper.processEvent(state: rebackgroundedState,
+                                                      now: 5200,
+                                                      messageId: "delayed-rotation-message-id",
+                                                      timestamp: "2026-01-01T00:00:05.200Z",
+                                                      foregroundSessionTimeout: 1_800_000,
+                                                      backgroundSessionTimeout: 2000)
+
+        XCTAssertEqual(result.contextSession,
+                       ContextSession(sessionId: 5200,
+                                      sessionIndex: 1,
+                                      sessionStart: true,
+                                      eventIndex: 0,
+                                      previousSessionId: 1000,
+                                      firstEventId: "delayed-rotation-message-id",
+                                      firstEventTimestamp: "2026-01-01T00:00:05.200Z"))
+    }
+
     func testColdStartRotatesWhenPersistedBackgroundedAtExceeded() {
         let backgroundedState = SessionState(sessionId: initialState.sessionId,
                                              sessionIndex: initialState.sessionIndex,

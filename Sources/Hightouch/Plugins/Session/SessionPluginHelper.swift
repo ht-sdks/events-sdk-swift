@@ -145,7 +145,7 @@ enum SessionPluginHelper {
                             firstEventTimestamp: state.firstEventTimestamp,
                             eventIndex: state.eventIndex,
                             lastActivityAt: state.lastActivityAt,
-                            backgroundedAt: now)
+                            backgroundedAt: state.backgroundedAt ?? now)
     }
 
     static func markForegrounded(state: SessionState?,
