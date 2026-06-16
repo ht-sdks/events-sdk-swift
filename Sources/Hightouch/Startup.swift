@@ -47,6 +47,10 @@ extension Analytics: Subscriber {
         
         plugins += VendorSystem.current.requiredPlugins
 
+        if SessionPluginHelper.isEnabled(configuration.values) {
+            plugins.append(SessionPlugin())
+        }
+
         // setup lifecycle if desired
         if configuration.values.trackApplicationLifecycleEvents {
             #if os(iOS) || os(tvOS)
@@ -62,10 +66,6 @@ extension Analytics: Subscriber {
             // placeholder - not sure what this is yet
             //plugins.append(LinuxLifecycleMonitor())
             #endif
-        }
-
-        if SessionPluginHelper.isEnabled(configuration.values) {
-            plugins.append(SessionPlugin())
         }
         
         if plugins.isEmpty {

@@ -152,6 +152,39 @@ final class Session_Tests: XCTestCase {
     }
 
     #if os(iOS) || os(tvOS) || targetEnvironment(macCatalyst)
+    func testApplicationOpenedStartsNewSessionAfterBackgroundTimeout() {
+        let analytics = makeLifecycleAnalytics(writeKey: "session-lifecycle-opened")
+        let output = OutputReaderPlugin()
+        analytics.add(plugin: output)
+        let sessionPlugin = configuredSessionPlugin(from: analytics)
+
+        sessionPlugin.now = { 1000 }
+        waitUntilStarted(analytics: analytics)
+        analytics.track(name: "First Event")
+
+        sessionPlugin.now = { 1500 }
+        sessionPlugin.applicationWillResignActive(application: nil)
+
+        sessionPlugin.now = { 4000 }
+        applicationWillEnterForeground(analytics: analytics)
+
+        guard let openedEvent = output.events.last as? TrackEvent else {
+            XCTFail("Expected Application Opened event")
+            return
+        }
+        XCTAssertEqual(openedEvent.event, "Application Opened")
+        XCTAssertEqual(openedEvent.properties?.dictionaryValue?["from_background"] as? Bool, true)
+
+        let eventContext = openedEvent.context?.dictionaryValue ?? [:]
+        let session = eventContext["session"] as? [String: Any]
+        XCTAssertEqual(number(eventContext["sessionId"]), 4000, "Application Opened should start a new session")
+        XCTAssertEqual(eventContext["sessionStart"] as? Bool, true)
+        XCTAssertEqual(number(session?["sessionId"]), 4000)
+        XCTAssertEqual(number(session?["sessionIndex"]), 1)
+        XCTAssertEqual(number(session?["previousSessionId"]), 1000)
+        XCTAssertEqual(session?["sessionStart"] as? Bool, true)
+    }
+
     func testRotatesAfterBackgroundTimeout() {
         let analytics = makeAnalytics(writeKey: "session-background-rotation")
         let output = OutputReaderPlugin()
@@ -208,6 +241,39 @@ final class Session_Tests: XCTestCase {
     #endif
 
     #if os(macOS)
+    func testApplicationUnhiddenStartsNewSessionAfterBackgroundTimeout() {
+        let analytics = makeLifecycleAnalytics(writeKey: "session-lifecycle-unhidden")
+        let output = OutputReaderPlugin()
+        analytics.add(plugin: output)
+        let sessionPlugin = configuredSessionPlugin(from: analytics)
+
+        sessionPlugin.now = { 1000 }
+        waitUntilStarted(analytics: analytics)
+        analytics.track(name: "First Event")
+
+        sessionPlugin.now = { 1500 }
+        sessionPlugin.applicationDidResignActive()
+
+        sessionPlugin.now = { 4000 }
+        applicationDidUnhide(analytics: analytics)
+
+        guard let unhiddenEvent = output.events.last as? TrackEvent else {
+            XCTFail("Expected Application Unhidden event")
+            return
+        }
+        XCTAssertEqual(unhiddenEvent.event, "Application Unhidden")
+        XCTAssertEqual(unhiddenEvent.properties?.dictionaryValue?["from_background"] as? Bool, true)
+
+        let eventContext = unhiddenEvent.context?.dictionaryValue ?? [:]
+        let session = eventContext["session"] as? [String: Any]
+        XCTAssertEqual(number(eventContext["sessionId"]), 4000, "Application Unhidden should start a new session")
+        XCTAssertEqual(eventContext["sessionStart"] as? Bool, true)
+        XCTAssertEqual(number(session?["sessionId"]), 4000)
+        XCTAssertEqual(number(session?["sessionIndex"]), 1)
+        XCTAssertEqual(number(session?["previousSessionId"]), 1000)
+        XCTAssertEqual(session?["sessionStart"] as? Bool, true)
+    }
+
     func testRotatesAfterBackgroundTimeout() {
         let analytics = makeAnalytics(writeKey: "session-background-rotation")
         let output = OutputReaderPlugin()
@@ -306,6 +372,46 @@ final class Session_Tests: XCTestCase {
             .backgroundSessionTimeout(2000))
         return analytics
     }
+
+    #if os(iOS) || os(tvOS) || targetEnvironment(macCatalyst)
+    private func makeLifecycleAnalytics(writeKey suffix: String) -> Analytics {
+        let writeKey = "test-\(suffix)"
+        resetStorage(writeKey: writeKey)
+        return Analytics(configuration: Configuration(writeKey: writeKey)
+            .autoAddSegmentDestination(false)
+            .trackApplicationLifecycleEvents(true)
+            .foregroundSessionTimeout(2000)
+            .backgroundSessionTimeout(2000))
+    }
+
+    private func applicationWillEnterForeground(analytics: Analytics) {
+        analytics.timeline.apply { plugin in
+            if let lifecycle = plugin as? iOSLifecycle {
+                lifecycle.applicationWillEnterForeground(application: nil)
+            }
+        }
+    }
+    #endif
+
+    #if os(macOS)
+    private func makeLifecycleAnalytics(writeKey suffix: String) -> Analytics {
+        let writeKey = "test-\(suffix)"
+        resetStorage(writeKey: writeKey)
+        return Analytics(configuration: Configuration(writeKey: writeKey)
+            .autoAddSegmentDestination(false)
+            .trackApplicationLifecycleEvents(true)
+            .foregroundSessionTimeout(2000)
+            .backgroundSessionTimeout(2000))
+    }
+
+    private func applicationDidUnhide(analytics: Analytics) {
+        analytics.timeline.apply { plugin in
+            if let lifecycle = plugin as? macOSLifecycle {
+                lifecycle.applicationDidUnhide()
+            }
+        }
+    }
+    #endif
 
     private func resetStorage(writeKey: String) {
         let storage = Storage(store: Store(), writeKey: writeKey)

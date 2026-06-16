@@ -8,7 +8,7 @@
 import Foundation
 
 class SessionPlugin: PlatformPlugin, EventPlugin {
-    let type = PluginType.enrichment
+    let type = PluginType.before
     weak var analytics: Analytics?
 
     var now: () -> Int64 = {
