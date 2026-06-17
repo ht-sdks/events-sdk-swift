@@ -172,6 +172,7 @@ extension Storage {
         case anonymousIdSegment = "segment.anonymousId"
         case anonymousIdRudder = "rl_anonymous_id"
         case settings = "hightouch.settings"
+        case sessionState = "hightouch.sessionState"
         case events = "hightouch.events"
     }
 }
@@ -192,6 +193,7 @@ extension Storage {
             write(.settings, value: s)
         }
     }
+
 }
 
 // MARK: - Utility Methods

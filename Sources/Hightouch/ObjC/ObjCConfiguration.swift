@@ -60,6 +60,30 @@ public class ObjCConfiguration: NSObject {
             configuration.flushInterval(value)
         }
     }
+
+    /// Set the maximum foreground inactivity in milliseconds before starting a new session.
+    /// The default value is `1_800_000` (30 minutes). Set both session timeouts to `0` to disable sessions.
+    @objc
+    public var foregroundSessionTimeout: Int {
+        get {
+            return configuration.values.foregroundSessionTimeout
+        }
+        set(value) {
+            configuration.foregroundSessionTimeout(value)
+        }
+    }
+
+    /// Set the maximum background duration in milliseconds before starting a new session on resume.
+    /// The default value is `1_800_000` (30 minutes). Set both session timeouts to `0` to disable sessions.
+    @objc
+    public var backgroundSessionTimeout: Int {
+        get {
+            return configuration.values.backgroundSessionTimeout
+        }
+        set(value) {
+            configuration.backgroundSessionTimeout(value)
+        }
+    }
     
     /// Sets a default set of Settings.  Normally these will come from Segment's
     /// api.segment.com/v1/projects/<writekey>/settings, however in instances such

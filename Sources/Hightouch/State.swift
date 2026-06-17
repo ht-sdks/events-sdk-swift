@@ -135,6 +135,31 @@ struct UserInfo: Codable, State {
     }
 }
 
+// MARK: - Session information
+
+struct SessionState: Codable, Equatable {
+    let sessionId: Int64
+    let sessionIndex: Int
+    let previousSessionId: Int64?
+    let firstEventId: String
+    let firstEventTimestamp: String
+    let eventIndex: Int
+    let lastActivityAt: Int64
+    let backgroundedAt: Int64?
+}
+
+struct SessionInfo: State {
+    let sessionState: SessionState?
+
+    struct UpdateSessionAction: Action {
+        let update: (SessionState?) -> SessionState?
+
+        func reduce(state: SessionInfo) -> SessionInfo {
+            return SessionInfo(sessionState: update(state.sessionState))
+        }
+    }
+}
+
 // MARK: - Default State Setup
 
 extension System {
@@ -167,5 +192,12 @@ extension UserInfo {
         }
 
         return UserInfo(anonymousId: anonymousId, userId: userId, traits: traits, referrer: nil)
+    }
+}
+
+extension SessionInfo {
+    static func defaultState(from storage: Storage) -> SessionInfo {
+        let sessionState: SessionState? = storage.read(.sessionState)
+        return SessionInfo(sessionState: sessionState)
     }
 }

@@ -65,6 +65,7 @@ public class Analytics {
         // provide our default state
         store.provide(state: System.defaultState(configuration: configuration, from: storage))
         store.provide(state: UserInfo.defaultState(from: storage))
+        store.provide(state: SessionInfo.defaultState(from: storage))
         
         storage.analytics = self
         

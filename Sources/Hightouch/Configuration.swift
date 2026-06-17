@@ -19,6 +19,8 @@ public class Configuration {
         var trackApplicationLifecycleEvents: Bool = true
         var flushAt: Int = 20
         var flushInterval: TimeInterval = 30
+        var foregroundSessionTimeout: Int = 1_800_000
+        var backgroundSessionTimeout: Int = 1_800_000
         var defaultSettings: Settings? = nil
         var autoAddSegmentDestination: Bool = true
         var apiHost: String = HTTPClient.getDefaultAPIHost()
@@ -91,6 +93,34 @@ public extension Configuration {
     @discardableResult
     func flushInterval(_ interval: TimeInterval) -> Configuration {
         values.flushInterval = interval
+        return self
+    }
+
+    /// Set the maximum foreground inactivity in milliseconds before starting a new session.
+    /// The default value is `1_800_000` (30 minutes). Set both session timeouts to `0` to disable sessions.
+    ///
+    /// - Parameter timeout: Timeout in milliseconds.
+    /// - Returns: The current Configuration.
+    @discardableResult
+    func foregroundSessionTimeout(_ timeout: Int) -> Configuration {
+        guard SessionPluginHelper.isValidSessionTimeout(timeout) else {
+            fatalError("foregroundSessionTimeout must be greater than or equal to zero.")
+        }
+        values.foregroundSessionTimeout = timeout
+        return self
+    }
+
+    /// Set the maximum background duration in milliseconds before starting a new session on resume.
+    /// The default value is `1_800_000` (30 minutes). Set both session timeouts to `0` to disable sessions.
+    ///
+    /// - Parameter timeout: Timeout in milliseconds.
+    /// - Returns: The current Configuration.
+    @discardableResult
+    func backgroundSessionTimeout(_ timeout: Int) -> Configuration {
+        guard SessionPluginHelper.isValidSessionTimeout(timeout) else {
+            fatalError("backgroundSessionTimeout must be greater than or equal to zero.")
+        }
+        values.backgroundSessionTimeout = timeout
         return self
     }
     
