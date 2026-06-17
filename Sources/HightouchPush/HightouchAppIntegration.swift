@@ -106,10 +106,9 @@ public enum HightouchAppIntegration {
             let handled = HightouchPush.urlDelegate?.handle(url: url, inContext: context) ?? false
             if handled { return }
 
-            let scheme = url.scheme?.lowercased() ?? ""
-            let isAllowed = scheme == "https" || HightouchPush.allowedProtocols.contains(scheme)
-            guard isAllowed else {
-                print("[HightouchPush] Dropping URL with disallowed scheme '\(scheme)'. Add it to HightouchPushConfig.allowedProtocols to opt in.")
+            let scheme = url.scheme ?? ""
+            guard HightouchPush.isSchemeAllowed(scheme, allowedProtocols: HightouchPush.allowedProtocols) else {
+                print("[HightouchPush] Dropping URL with disallowed scheme '\(HightouchPush.normalizeScheme(scheme))'. Add it to HightouchPushConfig.allowedProtocols to opt in.")
                 return
             }
 

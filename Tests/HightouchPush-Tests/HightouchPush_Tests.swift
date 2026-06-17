@@ -133,4 +133,31 @@ final class HightouchPush_Tests: XCTestCase {
         XCTAssertNil(merged["sendId"])
         XCTAssertNil(merged["_ht_message_context"])
     }
+
+    // MARK: - HightouchPush.isSchemeAllowed
+
+    func testHttpsIsAlwaysAllowedRegardlessOfCaseAndList() {
+        XCTAssertTrue(HightouchPush.isSchemeAllowed("https", allowedProtocols: []))
+        XCTAssertTrue(HightouchPush.isSchemeAllowed("HTTPS", allowedProtocols: []))
+    }
+
+    func testAllowedProtocolMatchesIgnoringCase() {
+        // The deep-link scheme arrives lowercased from URL.scheme; a developer who configured
+        // it with different casing should still match.
+        XCTAssertTrue(HightouchPush.isSchemeAllowed("myapp", allowedProtocols: ["MyApp"]))
+        XCTAssertTrue(HightouchPush.isSchemeAllowed("MyApp", allowedProtocols: ["myapp"]))
+    }
+
+    func testAllowedProtocolMatchesIgnoringSurroundingWhitespace() {
+        XCTAssertTrue(HightouchPush.isSchemeAllowed("myapp", allowedProtocols: ["  myapp  "]))
+    }
+
+    func testSchemeNotInListIsDisallowed() {
+        XCTAssertFalse(HightouchPush.isSchemeAllowed("tel", allowedProtocols: ["myapp"]))
+        XCTAssertFalse(HightouchPush.isSchemeAllowed("myapp", allowedProtocols: []))
+    }
+
+    func testNormalizeSchemeLowercasesAndTrims() {
+        XCTAssertEqual(HightouchPush.normalizeScheme("  MyApp  "), "myapp")
+    }
 }

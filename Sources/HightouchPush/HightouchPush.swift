@@ -32,17 +32,50 @@ public final class HightouchPush {
         return Analytics(configuration: Configuration(writeKey: "uninitialized"))
     }
 
-    /// Initialize with a write key. Creates an internal Analytics instance
-    /// for clients who are not already using Hightouch Analytics.
+    /// Canonical form of a URL scheme: lowercased (schemes are case-insensitive per RFC 3986)
+    /// and stripped of surrounding whitespace.
+    static func normalizeScheme(_ scheme: String) -> String {
+        scheme.trimmingCharacters(in: .whitespaces).lowercased()
+    }
+
+    /// Whether the SDK may open a URL with the given scheme. "https" is always allowed; any other
+    /// scheme must appear in `allowedProtocols`. Self-contained (normalizes both sides) so the
+    /// allow decision is unit-testable without the iOS notification flow.
+    static func isSchemeAllowed(_ scheme: String, allowedProtocols: [String]) -> Bool {
+        let normalized = normalizeScheme(scheme)
+        if normalized == "https" { return true }
+        return allowedProtocols.contains { normalizeScheme($0) == normalized }
+    }
+
+    /// Returns a copy of the push config with `allowedProtocols` canonicalized to lowercased,
+    /// trimmed scheme names. Applied when the config enters the SDK so every reader sees clean data.
+    private static func normalizeConfig(_ config: HightouchPushConfig) -> HightouchPushConfig {
+        var normalized = config
+        normalized.allowedProtocols = config.allowedProtocols.map(normalizeScheme)
+        return normalized
+    }
+
+    /// Initialize with an analytics `Configuration`. HightouchPush builds and owns the
+    /// underlying `Analytics` instance from it.
+    ///
+    /// Use this if you are not already using Hightouch Analytics. Because you supply the full
+    /// `Configuration`, every analytics option is set exactly as in the base SDK — including
+    /// the region endpoints required for non-default workspaces:
+    ///
+    ///     let configuration = Configuration(writeKey: "WRITE_KEY")
+    ///         .apiHost("ap-south-1.hightouch-events.com/v1")
+    ///         .cdnHost("ap-south-1.hightouch-events.com/v1")
+    ///     HightouchPush.initialize(
+    ///         configuration: configuration,
+    ///         config: HightouchPushConfig(appId: "APP_ID")
+    ///     )
     public static func initialize(
-        writeKey: String,
+        configuration: Configuration,
         config: HightouchPushConfig
     ) {
-        let analyticsConfig = Configuration(writeKey: writeKey)
-            .defaultSettings(Settings(writeKey: writeKey))
-        let a = Analytics(configuration: analyticsConfig)
+        let a = Analytics(configuration: configuration)
         _analytics = a
-        _config = config
+        _config = normalizeConfig(config)
         _currentUserId = a.userId
         _apnsToken = UserDefaults.standard.data(forKey: apnsTokenKey)
     }
@@ -59,7 +92,7 @@ public final class HightouchPush {
         config: HightouchPushConfig
     ) {
         _analytics = analytics
-        _config = config
+        _config = normalizeConfig(config)
         _currentUserId = analytics.userId
         _apnsToken = UserDefaults.standard.data(forKey: apnsTokenKey)
     }
@@ -131,6 +164,29 @@ extension HightouchPush {
     /// Analytics+Push customers must use HightouchPush.identify() instead of
     /// analytics.identify() directly, so that neither of the above steps is skipped.
     public static func identify(userId: String) {
+        performIdentify(userId: userId) {
+            analytics.identify(userId: userId)
+        }
+    }
+
+    /// Identify the current user and record traits. Mirrors `Analytics.identify(userId:traits:)`.
+    public static func identify(userId: String, traits: [String: Any]? = nil) {
+        performIdentify(userId: userId) {
+            analytics.identify(userId: userId, traits: traits)
+        }
+    }
+
+    /// Identify the current user and record typed (Codable) traits.
+    /// Mirrors `Analytics.identify(userId:traits:)`.
+    public static func identify<T: Codable>(userId: String, traits: T?) {
+        performIdentify(userId: userId) {
+            analytics.identify(userId: userId, traits: traits)
+        }
+    }
+
+    /// Shared push-specific identify behavior — user-switch logout and APNs token
+    /// re-registration — followed by the supplied analytics identify call.
+    private static func performIdentify(userId: String, emit: () -> Void) {
         if let current = _currentUserId, current != userId {
             logout()
         }
@@ -143,7 +199,7 @@ extension HightouchPush {
         }
         #endif
 
-        analytics.identify(userId: userId)
+        emit()
     }
 
     /// The userId of the currently identified user. Nil if no user is identified.

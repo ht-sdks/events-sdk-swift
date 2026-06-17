@@ -21,9 +21,10 @@ public struct HightouchPushConfig {
     public weak var customActionDelegate: (any HightouchCustomActionDelegate)?
 
     /// Additional URL schemes the SDK is allowed to open when falling back to
-    /// UIApplication.shared.open. The "https" scheme is always allowed. Add other schemes
-    /// (e.g. "myapp", "tel", "sms") to opt them in. URLs whose scheme is not "https" and
-    /// not in this list are dropped after the urlDelegate declines them.
+    /// UIApplication.shared.open. The "https" scheme is always allowed. Add other schemes as
+    /// bare scheme names (e.g. "myapp", "tel", "sms" — not "myapp://"). Matching is
+    /// case-insensitive and ignores surrounding whitespace. URLs whose scheme is not "https"
+    /// and not in this list are dropped after the urlDelegate declines them.
     public var allowedProtocols: [String] = []
 
     public init(appId: String) {
