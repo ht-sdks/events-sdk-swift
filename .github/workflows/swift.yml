@@ -60,7 +60,7 @@ jobs:
         with:
           xcode-version: "15.4"
       - uses: actions/checkout@v2
-      - run: xcodebuild -scheme Hightouch test -sdk watchsimulator -destination 'platform=watchOS Simulator,name=Apple Watch Series 9 (45mm)'
+      - run: xcodebuild -scheme Hightouch test -sdk watchsimulator -destination 'generic/platform=watchOS Simulator'
 
   build_and_test_examples:
     runs-on: macos-14

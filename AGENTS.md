@@ -191,7 +191,7 @@ xcodebuild -scheme Hightouch test -sdk appletvsimulator \
 
 # watchOS Simulator
 xcodebuild -scheme Hightouch test -sdk watchsimulator \
-  -destination 'platform=watchOS Simulator,name=Apple Watch Series 9 (45mm)'
+  -destination 'generic/platform=watchOS Simulator'
 ```
 
 **Linux:**
@@ -227,7 +227,7 @@ Runs on push/PR to `main`. Jobs:
 | `build_and_test_spm_linux` | Ubuntu, Swift 5.10.1 | `swift build` + `swift test --enable-test-discovery` |
 | `build_and_test_ios` | macOS 14, Xcode 15.4 | `xcodebuild test` on iPhone 15 simulator |
 | `build_and_test_tvos` | macOS 14, Xcode 15.4 | `xcodebuild test` on Apple TV simulator |
-| `build_and_test_watchos` | macOS 14, Xcode 15.4 | `xcodebuild test` on Apple Watch Series 9 simulator |
+| `build_and_test_watchos` | macOS 14, Xcode 15.4 | `xcodebuild test` on watchOS Simulator (generic destination) |
 | `build_and_test_examples` | macOS 14, Xcode 15.4 | Builds BasicExample, ObjCExample, UIKitExample, WeatherWidget, Mac Catalyst |
 
 ### Release Workflow (`.github/workflows/tagged-release.yml`)
