@@ -87,6 +87,7 @@ final class Session_Tests: XCTestCase {
         XCTAssertEqual(session?["sessionStart"] as? Bool, true)
         XCTAssertEqual(number(session?["previousSessionId"]), 1000)
         let firstEventId = session?["firstEventId"] as? String
+        XCTAssertNotNil(firstEventId)
         XCTAssertNotEqual(firstEventId, "")
         XCTAssertEqual(firstEventId, (output.events[1] as? TrackEvent)?.messageId)
     }
