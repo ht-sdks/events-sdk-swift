@@ -16,6 +16,9 @@ let package = Package(
         .library(
             name: "Hightouch",
             targets: ["Hightouch"]),
+        .library(
+            name: "HightouchPush",
+            targets: ["HightouchPush"]),
     ],
     dependencies: [
         // Dependencies declare other packages that this package depends on.
@@ -31,8 +34,16 @@ let package = Package(
                 .product(name: "Sovran", package: "sovran-swift")
             ],
             resources: [.process("Resources")]),
+        .target(
+            name: "HightouchPush",
+            dependencies: ["Hightouch"],
+            path: "Sources/HightouchPush"),
         .testTarget(
             name: "Hightouch-Tests",
             dependencies: ["Hightouch"]),
+        .testTarget(
+            name: "HightouchPush-Tests",
+            dependencies: ["HightouchPush", "Hightouch"],
+            path: "Tests/HightouchPush-Tests"),
     ]
 )
