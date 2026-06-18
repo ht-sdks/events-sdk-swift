@@ -7,11 +7,17 @@ struct PushTestAppApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @State private var isLoggedIn = false
     @State private var isConfigured: Bool = {
-        if UserDefaults.standard.string(forKey: "ht_write_key") != nil {
+        // Both writeKey and appId are required — an empty appId silently breaks push
+        // association, so it can't be treated as "configured."
+        let savedWriteKey = UserDefaults.standard.string(forKey: "ht_write_key")?.trimmingCharacters(in: .whitespaces) ?? ""
+        let savedAppId = UserDefaults.standard.string(forKey: "ht_app_id")?.trimmingCharacters(in: .whitespaces) ?? ""
+        if !savedWriteKey.isEmpty, !savedAppId.isEmpty {
             return true
         }
-        // Also consider configured if a build-time write key is present in Info.plist
-        if let plistKey = Bundle.main.infoDictionary?["HightouchWriteKey"] as? String, !plistKey.isEmpty {
+        // Also consider configured if build-time defaults are present in Info.plist
+        let plistWriteKey = Bundle.main.infoDictionary?["HightouchWriteKey"] as? String ?? ""
+        let plistAppId = Bundle.main.infoDictionary?["HightouchAppId"] as? String ?? ""
+        if !plistWriteKey.isEmpty, !plistAppId.isEmpty {
             return true
         }
         return false
@@ -57,11 +63,11 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
             ?? Bundle.main.infoDictionary?["HightouchAppId"] as? String
             ?? ""
 
-        if !writeKey.isEmpty {
+        if !writeKey.isEmpty, !appId.isEmpty {
             AppDelegate.initializeHightouchPush(writeKey: writeKey, apiHost: apiHost, appId: appId)
         }
-        // If neither UserDefaults nor Info.plist has a write key, SettingsView will call
-        // initializeHightouchPush after the user enters config.
+        // apiHost stays optional (empty = default region). If writeKey or appId is missing,
+        // SettingsView will call initializeHightouchPush after the user enters config.
 
         return true
     }
