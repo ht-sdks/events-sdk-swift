@@ -40,7 +40,7 @@ struct SettingsView: View {
                 .autocorrectionDisabled()
                 .padding(.horizontal)
 
-            TextField("API Host", text: $apiHost)
+            TextField("API Host (optional)", text: $apiHost)
                 .textFieldStyle(.roundedBorder)
                 .autocapitalization(.none)
                 .autocorrectionDisabled()
@@ -56,7 +56,10 @@ struct SettingsView: View {
                 let trimmedKey = writeKey.trimmingCharacters(in: .whitespaces)
                 let trimmedHost = apiHost.trimmingCharacters(in: .whitespaces)
                 let trimmedAppId = appId.trimmingCharacters(in: .whitespaces)
-                guard !trimmedKey.isEmpty else { return }
+                // appId is required: without it, push token events carry an empty app_id and
+                // push silently fails to associate the device. apiHost stays optional (empty
+                // means the default region endpoint).
+                guard !trimmedKey.isEmpty, !trimmedAppId.isEmpty else { return }
 
                 UserDefaults.standard.set(trimmedKey, forKey: "ht_write_key")
                 UserDefaults.standard.set(trimmedHost, forKey: "ht_api_host")
@@ -74,7 +77,10 @@ struct SettingsView: View {
                 dismiss()
             }
             .buttonStyle(.borderedProminent)
-            .disabled(writeKey.trimmingCharacters(in: .whitespaces).isEmpty)
+            .disabled(
+                writeKey.trimmingCharacters(in: .whitespaces).isEmpty
+                    || appId.trimmingCharacters(in: .whitespaces).isEmpty
+            )
 
             if hasDefaults {
                 Button("Reset to Defaults") {

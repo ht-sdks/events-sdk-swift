@@ -25,9 +25,10 @@ struct PushTestAppApp: App {
                 } else if isLoggedIn {
                     HomeView(isLoggedIn: $isLoggedIn)
                 } else {
-                    NavigationStack {
+                    NavigationView {
                         LoginView(isLoggedIn: $isLoggedIn, isConfigured: $isConfigured)
                     }
+                    .navigationViewStyle(.stack)
                 }
             }
             .onAppear {
