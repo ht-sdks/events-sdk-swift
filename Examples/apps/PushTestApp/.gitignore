@@ -1,0 +1,6 @@
+Config.xcconfig
+
+# The Xcode project is intentionally not committed; copy in your own
+# project files to build this example locally.
+PushTestApp.xcodeproj/
+PushTestApp.xcworkspace/
