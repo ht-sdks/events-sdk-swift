@@ -1,0 +1,95 @@
+name: XCFramework Release
+
+on:
+  push:
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]+"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to build (e.g. 0.1.0)"
+        required: true
+        type: string
+      dry_run:
+        description: "Skip upload to the GitHub Release (default true for safety). Workflow artifacts are always uploaded."
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: xcframework-release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  RELEASE_SOURCE_DIR: release-source
+
+jobs:
+  build-and-upload:
+    name: Build and upload XCFrameworks
+    runs-on: macos-14
+    steps:
+      - name: Resolve release tag
+        id: meta
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+            echo "dry_run=${{ inputs.dry_run }}" >> "$GITHUB_OUTPUT"
+            echo "script_ref=${GITHUB_REF}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+            echo "dry_run=false" >> "$GITHUB_OUTPUT"
+            echo "script_ref=refs/heads/${{ github.event.repository.default_branch }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout build scripts
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.meta.outputs.script_ref }}
+          path: build-tools
+
+      - name: Checkout release source
+        uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ steps.meta.outputs.tag }}
+          path: ${{ env.RELEASE_SOURCE_DIR }}
+
+      - name: Select Xcode 15.4
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: "15.4"
+
+      - name: Build XCFrameworks
+        env:
+          SOURCE_ROOT: ${{ github.workspace }}/${{ env.RELEASE_SOURCE_DIR }}
+        run: ./build-tools/scripts/build-xcframeworks.sh
+
+      - name: Upload to GitHub Release
+        if: steps.meta.outputs.dry_run == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ steps.meta.outputs.tag }}"
+          if ! gh release view "$TAG"; then
+            echo "error: GitHub Release '$TAG' not found. Create the release before uploading assets." >&2
+            exit 1
+          fi
+          gh release upload "$TAG" \
+            "${RELEASE_SOURCE_DIR}/Hightouch.zip" \
+            "${RELEASE_SOURCE_DIR}/Hightouch.sha256" \
+            "${RELEASE_SOURCE_DIR}/Sovran.zip" \
+            "${RELEASE_SOURCE_DIR}/Sovran.sha256" \
+            --clobber
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcframeworks-${{ steps.meta.outputs.tag }}
+          path: |
+            release-source/Hightouch.zip
+            release-source/Hightouch.sha256
+            release-source/Sovran.zip
+            release-source/Sovran.sha256
+          retention-days: 7
