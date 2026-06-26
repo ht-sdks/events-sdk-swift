@@ -81,6 +81,7 @@ jobs:
         if: steps.meta.outputs.dry_run == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           TAG="${{ steps.meta.outputs.tag }}"
           if ! gh release view "$TAG"; then
