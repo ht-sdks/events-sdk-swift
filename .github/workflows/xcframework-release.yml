@@ -5,12 +5,6 @@ on:
   # push:
   #   tags:
   #     - "[0-9]+.[0-9]+.[0-9]+"
-
-  # PRE-MERGE TESTING ONLY — remove this push block before merging to main.
-  push:
-    branches:
-      - jonathanchaffer/xcframework-release-fix
-
   workflow_dispatch:
     inputs:
       tag:
@@ -47,15 +41,6 @@ jobs:
             echo "script_ref=${GITHUB_REF}" >> "$GITHUB_OUTPUT"
             echo "source_ref=refs/tags/${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
             echo "artifact_name=xcframeworks-${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
-          elif [[ "${{ github.ref }}" == refs/heads/* ]]; then
-            # PRE-MERGE TESTING ONLY — remove this branch before merging to main.
-            # Builds branch head (not a release tag). Always dry_run; never uploads to a release.
-            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
-            echo "dry_run=true" >> "$GITHUB_OUTPUT"
-            echo "script_ref=${GITHUB_REF}" >> "$GITHUB_OUTPUT"
-            echo "source_ref=${GITHUB_REF}" >> "$GITHUB_OUTPUT"
-            artifact_name="xcframeworks-branch-${GITHUB_REF_NAME//\//-}-${{ github.run_number }}"
-            echo "artifact_name=${artifact_name}" >> "$GITHUB_OUTPUT"
           else
             echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
             echo "dry_run=false" >> "$GITHUB_OUTPUT"
