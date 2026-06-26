@@ -7,3 +7,4 @@ released version will be used as the changelog for the release.
 
 ex: $ ./release.sh 1.1.1
 
+CI will automatically build and upload XCFramework zip assets on each release. See [xcframework-release.yml](.github/workflows/xcframework-release.yml).
