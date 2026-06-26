@@ -5,6 +5,12 @@ on:
   # push:
   #   tags:
   #     - "[0-9]+.[0-9]+.[0-9]+"
+
+  # PRE-MERGE TESTING ONLY — remove this push block before merging to main.
+  push:
+    branches:
+      - jonathanchaffer/xcframework-release-fix
+
   workflow_dispatch:
     inputs:
       tag:
@@ -39,10 +45,23 @@ jobs:
             echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
             echo "dry_run=${{ inputs.dry_run }}" >> "$GITHUB_OUTPUT"
             echo "script_ref=${GITHUB_REF}" >> "$GITHUB_OUTPUT"
+            echo "source_ref=refs/tags/${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+            echo "artifact_name=xcframeworks-${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.ref }}" == refs/heads/* ]]; then
+            # PRE-MERGE TESTING ONLY — remove this branch before merging to main.
+            # Builds branch head (not a release tag). Always dry_run; never uploads to a release.
+            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+            echo "dry_run=true" >> "$GITHUB_OUTPUT"
+            echo "script_ref=${GITHUB_REF}" >> "$GITHUB_OUTPUT"
+            echo "source_ref=${GITHUB_REF}" >> "$GITHUB_OUTPUT"
+            artifact_name="xcframeworks-branch-${GITHUB_REF_NAME//\//-}-${{ github.run_number }}"
+            echo "artifact_name=${artifact_name}" >> "$GITHUB_OUTPUT"
           else
             echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
             echo "dry_run=false" >> "$GITHUB_OUTPUT"
             echo "script_ref=refs/heads/${{ github.event.repository.default_branch }}" >> "$GITHUB_OUTPUT"
+            echo "source_ref=refs/tags/${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+            echo "artifact_name=xcframeworks-${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Checkout build scripts
@@ -54,7 +73,7 @@ jobs:
       - name: Checkout release source
         uses: actions/checkout@v4
         with:
-          ref: refs/tags/${{ steps.meta.outputs.tag }}
+          ref: ${{ steps.meta.outputs.source_ref }}
           path: ${{ env.RELEASE_SOURCE_DIR }}
 
       - name: Select Xcode 15.4
@@ -87,7 +106,7 @@ jobs:
       - name: Upload workflow artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: xcframeworks-${{ steps.meta.outputs.tag }}
+          name: ${{ steps.meta.outputs.artifact_name }}
           path: |
             release-source/Hightouch.zip
             release-source/Hightouch.sha256
