@@ -1,10 +1,9 @@
 name: XCFramework Release
 
 on:
-  # Uncomment to enable automatic builds on tag push (e.g. after release.sh creates a tag).
-  # push:
-  #   tags:
-  #     - "[0-9]+.[0-9]+.[0-9]+"
+  push:
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]+"
   workflow_dispatch:
     inputs:
       tag:

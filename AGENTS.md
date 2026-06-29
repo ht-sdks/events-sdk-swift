@@ -14,17 +14,17 @@ This file provides instructions for AI agents working on this Swift SDK.
 ### Supported Platforms
 
 | Platform | Minimum Version |
-|----------|----------------|
-| macOS    | 10.15          |
-| iOS      | 13.0           |
-| tvOS     | 11.0           |
-| watchOS  | 7.1            |
-| Linux    | (Swift 5.10.1) |
+| -------- | --------------- |
+| macOS    | 10.15           |
+| iOS      | 13.0            |
+| tvOS     | 11.0            |
+| watchOS  | 7.1             |
+| Linux    | (Swift 5.10.1)  |
 
 ### Key Dependencies
 
-| Dependency | Purpose |
-|------------|---------|
+| Dependency                                                              | Purpose                                                         |
+| ----------------------------------------------------------------------- | --------------------------------------------------------------- |
 | [Sovran-Swift](https://github.com/segmentio/Sovran-Swift.git) (>=1.1.0) | Lightweight state management (Store, State, Action, Subscriber) |
 
 No other external dependencies. The SDK is intentionally lightweight.
@@ -221,16 +221,27 @@ git commit -m "Update Sovran-Swift dependency to X.Y.Z"
 
 Runs on push/PR to `main`. Jobs:
 
-| Job | Runner | What it does |
-|-----|--------|-------------|
-| `build_and_test_spm_mac` | macOS 14, Xcode 15.4 | `swift build` + `swift test` |
-| `build_and_test_spm_linux` | Ubuntu, Swift 5.10.1 | `swift build` + `swift test --enable-test-discovery` |
-| `build_and_test_ios` | macOS 14, Xcode 15.4 | `xcodebuild test` on iPhone 15 simulator |
-| `build_and_test_tvos` | macOS 14, Xcode 15.4 | `xcodebuild test` on Apple TV simulator |
-| `build_and_test_watchos` | macOS 14, Xcode 15.4 | `xcodebuild test` on Apple Watch Series 9 simulator |
-| `build_and_test_examples` | macOS 14, Xcode 15.4 | Builds BasicExample, ObjCExample, UIKitExample, WeatherWidget, Mac Catalyst |
+| Job                        | Runner               | What it does                                                                |
+| -------------------------- | -------------------- | --------------------------------------------------------------------------- |
+| `build_and_test_spm_mac`   | macOS 14, Xcode 15.4 | `swift build` + `swift test`                                                |
+| `build_and_test_spm_linux` | Ubuntu, Swift 5.10.1 | `swift build` + `swift test --enable-test-discovery`                        |
+| `build_and_test_ios`       | macOS 14, Xcode 15.4 | `xcodebuild test` on iPhone 15 simulator                                    |
+| `build_and_test_tvos`      | macOS 14, Xcode 15.4 | `xcodebuild test` on Apple TV simulator                                     |
+| `build_and_test_watchos`   | macOS 14, Xcode 15.4 | `xcodebuild test` on Apple Watch Series 9 simulator                         |
+| `build_and_test_examples`  | macOS 14, Xcode 15.4 | Builds BasicExample, ObjCExample, UIKitExample, WeatherWidget, Mac Catalyst |
 
-### Release Workflow (`.github/workflows/tagged-release.yml`)
+### Release Workflow (`.github/workflows/xcframework-release.yml`)
+
+Builds and uploads XCFramework zip assets on tag push (tags like `1.2.3`, no `v` prefix). Also supports manual `workflow_dispatch` with a `tag` input and optional `dry_run` (defaults to `true`).
+
+| Trigger             | Upload behavior                              |
+| ------------------- | -------------------------------------------- |
+| Tag push            | Always uploads to release                    |
+| `workflow_dispatch` | Uploads to release only when `dry_run=false` |
+
+Runs on macOS 14 with Xcode 15.4.
+
+### Slack Notification (`.github/workflows/tagged-release.yml`)
 
 Triggered by tags matching `v[0-9]+.[0-9]+.[0-9]+`. Posts a notification to Slack.
 
@@ -245,8 +256,8 @@ Use `release.sh` to perform releases. The script:
 3. Updates `Sources/Hightouch/Version.swift` with the new version
 4. Commits the change and pushes
 5. Creates a GitHub Release with a changelog (commits since last tag)
-6. Runs `build.sh` to produce XCFramework zips
-7. Uploads `Hightouch.zip`, `Hightouch.sha256`, `Sovran.zip`, `Sovran.sha256` to the release
+
+XCFramework assets are **not** built locally. Pushing the release tag triggers [`.github/workflows/xcframework-release.yml`](.github/workflows/xcframework-release.yml), which builds and uploads `Hightouch.zip`, `Hightouch.sha256`, `Sovran.zip`, and `Sovran.sha256` (~5-10 min).
 
 ```bash
 ./release.sh 1.2.3
@@ -255,7 +266,14 @@ Use `release.sh` to perform releases. The script:
 ### Required Tools for Releasing
 
 - `gh` (GitHub CLI): `brew install gh` — must be authenticated (`gh auth login`)
-- `swift-create-xcframework`: `brew install mint && mint install unsignedapps/swift-create-xcframework`
+
+### XCFramework CI Workflow
+
+- **Automatic:** tag push runs build + upload
+- **Retry:** Re-run a failed workflow from Actions
+- **Manual dispatch:** Mainly for testing/backfill. Actions → **XCFramework Release** → Run workflow with `tag` set; default `dry_run=true` skips GitHub Release upload
+
+Do **not** run `scripts/build-xcframeworks.sh` locally — CI uses a pinned Xcode 15.4 environment.
 
 ### Version File
 
@@ -266,6 +284,7 @@ internal let __hightouch_version = "X.Y.Z"
 ```
 
 This version string is used in:
+
 - `Analytics.version()` — public API
 - HTTP `User-Agent` header: `analytics-ios/<version>`
 - Context payload: `library.version`
@@ -311,6 +330,7 @@ func testMyFeature() {
 ### Test Isolation
 
 Tests share the same `UserDefaults` suite (`com.hightouch.storage.<writeKey>`). If a test modifies state, either:
+
 - Use a unique write key for that test
 - Call `storage.hardReset(doYouKnowHowToUseThis: true)` to clear state
 - Call `UserDefaults.standard.removePersistentDomain(forName:)` before the test

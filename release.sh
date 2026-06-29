@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -euo pipefail
+
 PROJECT_NAME="events-sdk-swift"
 PRODUCT_NAME="Hightouch"
 
@@ -44,22 +46,8 @@ then
 	exit 1
 fi
 
-# check if `swift-create-xcframework` tool is installed.
-# command will return non-zero if not.
-if ! command -v swift-create-xcframework &> /dev/null
-then
-	echo "Swift's create-xcframework tool is required, but could not be found."
-	echo "Install it via:"
-    echo "    $ brew install mint"
-    echo "    $ mint install unsignedapps/swift-create-xcframework"
-    echo ""
-	exit 1
-fi
-
 # check if `gh` tool has auth access.
-# command will return non-zero if not auth'd.
-authd=$(gh auth status -t)
-if [[ $? != 0 ]]; then
+if ! gh auth status -t &>/dev/null; then
 	echo "ex: $ gh auth login"
 	exit 1
 fi
@@ -73,7 +61,7 @@ then
 	exit 1
 fi
 
-versionFile="./sources/${PRODUCT_NAME}/Version.swift"
+versionFile="./Sources/${PRODUCT_NAME}/Version.swift"
 
 # get last line in version.swift
 versionLine=$(tail -n 1 $versionFile)
@@ -97,11 +85,16 @@ fi
 newVersion="${1%.*}.$((${1##*.}))"
 echo "Preparing to release $newVersion..."
 
-vercomp $newVersion $version
-case $? in
+vercomp_result=3
+vercomp $newVersion $version && vercomp_result=0 || vercomp_result=$?
+case $vercomp_result in
 	0) op='=';;
 	1) op='>';;
 	2) op='<';;
+	*)
+		echo "Unexpected version comparison result."
+		exit 1
+		;;
 esac
 
 if [ $op != '>' ]
@@ -126,7 +119,7 @@ tempFile=$(mktemp)
 #write changelog to temp file.
 echo -e "$changelog" >> $tempFile
 
-# update sources/Hightouch/Version.swift
+# update Sources/Hightouch/Version.swift
 # - remove last line...
 sed -i '' -e '$ d' $versionFile
 # - add new line w/ new version
@@ -140,13 +133,15 @@ gh release create $newVersion -F $tempFile -t "Version $newVersion"
 # remove the tempfile.
 rm $tempFile
 
-# build up the xcframework to upload to github
-./build.sh
+repo=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+workflow_url="https://github.com/${repo}/actions/workflows/xcframework-release.yml"
 
-# upload the release
-gh release upload $newVersion ${PRODUCT_NAME}.zip
-gh release upload $newVersion ${PRODUCT_NAME}.sha256
-
-# SPECIAL CASE: We need to upload Sovran to save them time.
-gh release upload $newVersion Sovran.zip
-gh release upload $newVersion Sovran.sha256
+echo ""
+echo "GitHub Release ${newVersion} created."
+echo ""
+echo "XCFramework assets (Hightouch.zip, Hightouch.sha256, Sovran.zip, Sovran.sha256)"
+echo "will be built and uploaded automatically by CI (~5-10 min):"
+echo "  ${workflow_url}"
+echo ""
+echo "If the workflow fails, re-run it from Actions or trigger workflow_dispatch"
+echo "with tag ${newVersion} and dry_run=false to retry the upload."
