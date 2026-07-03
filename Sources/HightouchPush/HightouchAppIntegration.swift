@@ -81,13 +81,40 @@ public enum HightouchAppIntegration {
 
     /// Call from application(_:didReceiveRemoteNotification:fetchCompletionHandler:) to handle
     /// silent push notifications.
+    ///
+    /// iOS invokes that AppDelegate method only for content-available pushes, so reaching this
+    /// handler already means the push is silent. When the push is a Hightouch push carrying
+    /// custom data and a silentPushDelegate is configured, the delegate receives the data and
+    /// the OS completion handler is called after the delegate returns — so async work in the
+    /// delegate (within the OS's ~30 second background budget) is not truncated. In every other
+    /// case (non-Hightouch push, badge-only silent push, no delegate) the handler completes
+    /// immediately with .noData.
     public static func application(
         _ application: UIApplication,
         didReceiveRemoteNotification userInfo: [AnyHashable: Any],
         fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
     ) {
-        // TODO: Process silent push notifications
-        completionHandler(.noData)
+        guard let payload = HTPushPayload(userInfo),
+              let customData = payload.customData, !customData.isEmpty,
+              let delegate = HightouchPush.silentPushDelegate else {
+            completionHandler(.noData)
+            return
+        }
+
+        Task {
+            await delegate.receive(customData: customData)
+            completionHandler(.newData)
+        }
+    }
+
+    /// The custom data attached to a notification the user interacted with, or nil when the
+    /// notification is not a Hightouch push or carries no custom data.
+    ///
+    /// iOS counterpart of the Android SDK's getCustomData(intent): call it from your
+    /// userNotificationCenter(_:didReceive:withCompletionHandler:) alongside the forwarding
+    /// call above to read the tapped push's custom data.
+    public static func customData(from response: UNNotificationResponse) -> [String: String]? {
+        return HTPushPayload(response.notification.request.content.userInfo)?.customData
     }
 
     private static func findActionButton(
