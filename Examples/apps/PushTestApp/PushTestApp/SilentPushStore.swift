@@ -24,6 +24,10 @@ final class SilentPushStore: ObservableObject {
 
     private static let defaultsKey = "ht_push_data_log"
 
+    // Serializes every load-modify-save so a silent-push append (concurrency pool thread)
+    // can't race a tap append or clear (main thread) and lose a write.
+    private let queue = DispatchQueue(label: "com.hightouch.PushTestApp.silent-push-store")
+
     private init() {
         entries = Self.load()
     }
@@ -32,19 +36,25 @@ final class SilentPushStore: ObservableObject {
         let entry = PushDataLogEntry(
             id: UUID(), receivedAt: Date(), source: source, customData: customData
         )
-        // Write to UserDefaults synchronously: iOS may suspend the app right after a background
-        // wake completes, so the entry must be on disk before the delegate returns.
-        var current = Self.load()
-        current.insert(entry, at: 0)
-        Self.save(current)
-        DispatchQueue.main.async {
-            self.entries = current
+        // Write to UserDefaults before returning: iOS may suspend the app right after a
+        // background wake completes, so the entry must be on disk when the delegate returns.
+        queue.sync {
+            var current = Self.load()
+            current.insert(entry, at: 0)
+            Self.save(current)
+            DispatchQueue.main.async {
+                self.entries = current
+            }
         }
     }
 
     func clear() {
-        Self.save([])
-        entries = []
+        queue.sync {
+            Self.save([])
+            DispatchQueue.main.async {
+                self.entries = []
+            }
+        }
     }
 
     private static func load() -> [PushDataLogEntry] {
