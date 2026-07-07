@@ -10,13 +10,20 @@ extension HightouchPush {
 
     /// Set the application icon badge to `count`. Negative values are clamped to 0.
     ///
-    /// Errors from the system badge API are logged and swallowed, so call sites do not
-    /// need `try`.
+    /// Requires badge authorization (the `.badge` option in the notification permission
+    /// request); without it the system call fails. Errors are logged and swallowed, so
+    /// call sites do not need `try` — but a denied badge permission means the badge
+    /// silently never changes.
+    ///
+    /// On iOS 13–15 the fallback (`applicationIconBadgeNumber`) has a system side effect:
+    /// setting it to 0 also removes the app's delivered notifications from Notification
+    /// Center. iOS 16+ (`setBadgeCount`) clears only the badge.
     public static func setBadge(_ count: Int) async {
         await setSystemBadge(clampedBadgeCount(count))
     }
 
-    /// Clear the application icon badge.
+    /// Clear the application icon badge. See `setBadge(_:)` for the iOS 13–15
+    /// Notification Center side effect of clearing to 0.
     public static func resetBadge() async {
         await setBadge(0)
     }
