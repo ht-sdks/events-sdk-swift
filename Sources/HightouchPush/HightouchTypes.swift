@@ -18,7 +18,6 @@ public protocol HightouchCustomActionDelegate: AnyObject {
     func handle(customAction action: HightouchAction, inContext context: HightouchActionContext) -> Bool
 }
 
-#if os(iOS) || targetEnvironment(macCatalyst)
 /// Implement to consume custom data delivered by silent (background) pushes.
 ///
 /// A silent push displays no notification: iOS wakes the app in the background and the SDK
@@ -32,7 +31,6 @@ public protocol HightouchCustomActionDelegate: AnyObject {
 public protocol HightouchSilentPushDelegate: AnyObject {
     func receive(customData: [String: String]) async
 }
-#endif
 
 public struct HightouchAction {
     /// The action type string from the payload (e.g. "openUrl", or a custom type).

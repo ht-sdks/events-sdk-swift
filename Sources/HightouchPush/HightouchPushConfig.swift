@@ -20,7 +20,6 @@ public struct HightouchPushConfig {
     /// Called when the user taps a button whose action type is not "openUrl".
     public weak var customActionDelegate: (any HightouchCustomActionDelegate)?
 
-    #if os(iOS) || targetEnvironment(macCatalyst)
     /// Consumes custom data delivered by silent (background) pushes.
     ///
     /// Silent pushes display nothing; their only payload is custom data (and optionally a
@@ -29,7 +28,6 @@ public struct HightouchPushConfig {
     /// reference to the delegate for the app's lifetime (e.g. a static property), and set it
     /// before initialize() so it exists when iOS launches the app into the background.
     public weak var silentPushDelegate: (any HightouchSilentPushDelegate)?
-    #endif
 
     /// Additional URL schemes the SDK is allowed to open when falling back to
     /// UIApplication.shared.open. The "https" scheme is always allowed. Add other schemes as
