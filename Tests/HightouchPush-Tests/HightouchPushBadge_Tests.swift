@@ -14,7 +14,7 @@ final class HightouchPushBadge_Tests: XCTestCase {
 
     override func tearDown() {
         let baseline = HightouchPushConfig(appId: "test-badge-teardown")
-        initialize(writeKey: "test-badge-teardown", config: baseline)
+        initialize(writeKey: "\(name)-teardown", config: baseline)
         super.tearDown()
     }
 

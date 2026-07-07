@@ -10,11 +10,15 @@ enum PushTestAppConfig {
     static let appIdDefaultsKey = "ht_app_id"
     static let autoClearBadgeDefaultsKey = "ht_auto_clear_badge_on_foreground"
 
+    /// Values are whitespace-trimmed here so every consumer (isConfigured, the
+    /// initialize guard, the settings form) sees the same canonical string.
     static func value(userDefaultsKey: String, plistKey: String) -> String {
-        if let saved = UserDefaults.standard.string(forKey: userDefaultsKey), !saved.isEmpty {
+        if let saved = UserDefaults.standard.string(forKey: userDefaultsKey)?
+            .trimmingCharacters(in: .whitespaces), !saved.isEmpty {
             return saved
         }
-        return Bundle.main.infoDictionary?[plistKey] as? String ?? ""
+        let plistValue = Bundle.main.infoDictionary?[plistKey] as? String ?? ""
+        return plistValue.trimmingCharacters(in: .whitespaces)
     }
 
     static var writeKey: String {
@@ -41,8 +45,7 @@ struct PushTestAppApp: App {
     // Both writeKey and appId are required — an empty appId silently breaks push
     // association, so it can't be treated as "configured."
     @State private var isConfigured: Bool =
-        !PushTestAppConfig.writeKey.trimmingCharacters(in: .whitespaces).isEmpty
-        && !PushTestAppConfig.appId.trimmingCharacters(in: .whitespaces).isEmpty
+        !PushTestAppConfig.writeKey.isEmpty && !PushTestAppConfig.appId.isEmpty
 
     var body: some Scene {
         WindowGroup {
