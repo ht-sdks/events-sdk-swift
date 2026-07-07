@@ -110,9 +110,8 @@ public enum HightouchAppIntegration {
     /// The custom data attached to a notification the user interacted with, or nil when the
     /// notification is not a Hightouch push or carries no custom data.
     ///
-    /// iOS counterpart of the Android SDK's getCustomData(intent): call it from your
-    /// userNotificationCenter(_:didReceive:withCompletionHandler:) alongside the forwarding
-    /// call above to read the tapped push's custom data.
+    /// Call it from your userNotificationCenter(_:didReceive:withCompletionHandler:) alongside
+    /// the forwarding call above to read the tapped push's custom data.
     public static func customData(from response: UNNotificationResponse) -> [String: String]? {
         return HTPushPayload(response.notification.request.content.userInfo)?.customData
     }

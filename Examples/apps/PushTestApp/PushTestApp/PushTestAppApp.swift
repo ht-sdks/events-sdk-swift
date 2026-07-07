@@ -154,8 +154,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
-        // Tap parity with Android's getCustomData(intent): read the tapped push's custom
-        // data and log it alongside silent deliveries.
+        // Read the tapped push's custom data and log it alongside silent deliveries.
         if let customData = HightouchAppIntegration.customData(from: response), !customData.isEmpty {
             SilentPushStore.shared.append(source: .tap, customData: customData)
         }
