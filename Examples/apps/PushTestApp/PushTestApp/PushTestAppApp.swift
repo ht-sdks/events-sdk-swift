@@ -43,7 +43,18 @@ struct PushTestAppApp: App {
     }
 }
 
+/// Receives silent-push custom data and logs it for the in-app "Push data" view.
+/// Held in a static so it outlives the weak reference the SDK config keeps.
+final class SilentPushHandler: HightouchSilentPushDelegate {
+    func receive(customData: [String: String]) async {
+        print("[PushTestApp] Silent push received: \(customData)")
+        SilentPushStore.shared.append(source: .silent, customData: customData)
+    }
+}
+
 class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
+
+    static let silentPushHandler = SilentPushHandler()
 
     func application(
         _ application: UIApplication,
@@ -72,7 +83,8 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
     }
 
     static func initializeHightouchPush(writeKey: String, apiHost: String, appId: String) {
-        let pushConfig = HightouchPushConfig(appId: appId)
+        var pushConfig = HightouchPushConfig(appId: appId)
+        pushConfig.silentPushDelegate = silentPushHandler
 
         let analyticsConfig = Configuration(writeKey: writeKey)
             .trackApplicationLifecycleEvents(true)
@@ -142,6 +154,11 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
+        // Read the tapped push's custom data and log it alongside silent deliveries.
+        if let customData = HightouchAppIntegration.customData(from: response), !customData.isEmpty {
+            SilentPushStore.shared.append(source: .tap, customData: customData)
+        }
+
         HightouchAppIntegration.userNotificationCenter(
             center, didReceive: response, withCompletionHandler: completionHandler
         )

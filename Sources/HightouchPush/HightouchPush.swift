@@ -19,6 +19,7 @@ public final class HightouchPush {
     private static var _config: HightouchPushConfig?
     static var urlDelegate: (any HightouchURLDelegate)? { _config?.urlDelegate }
     static var customActionDelegate: (any HightouchCustomActionDelegate)? { _config?.customActionDelegate }
+    static var silentPushDelegate: (any HightouchSilentPushDelegate)? { _config?.silentPushDelegate }
     static var allowedProtocols: [String] { _config?.allowedProtocols ?? [] }
     static var appId: String { _config?.appId ?? "" }
     private static var _apnsToken: Data?

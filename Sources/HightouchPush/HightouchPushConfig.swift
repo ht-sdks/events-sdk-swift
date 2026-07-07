@@ -20,6 +20,15 @@ public struct HightouchPushConfig {
     /// Called when the user taps a button whose action type is not "openUrl".
     public weak var customActionDelegate: (any HightouchCustomActionDelegate)?
 
+    /// Consumes custom data delivered by silent (background) pushes.
+    ///
+    /// Silent pushes display nothing; their only payload is custom data (and optionally a
+    /// badge, which iOS applies on its own). If this delegate is nil, silent pushes complete
+    /// immediately with no effect. The config holds only a weak reference — keep a strong
+    /// reference to the delegate for the app's lifetime (e.g. a static property), and set it
+    /// before initialize() so it exists when iOS launches the app into the background.
+    public weak var silentPushDelegate: (any HightouchSilentPushDelegate)?
+
     /// Additional URL schemes the SDK is allowed to open when falling back to
     /// UIApplication.shared.open. The "https" scheme is always allowed. Add other schemes as
     /// bare scheme names (e.g. "myapp", "tel", "sms" — not "myapp://"). Matching is
