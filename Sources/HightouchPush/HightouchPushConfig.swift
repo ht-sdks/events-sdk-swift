@@ -29,6 +29,11 @@ public struct HightouchPushConfig {
     /// before initialize() so it exists when iOS launches the app into the background.
     public weak var silentPushDelegate: (any HightouchSilentPushDelegate)?
 
+    /// When true, the SDK observes UIApplication.didBecomeActiveNotification and clears the
+    /// application icon badge each time the app enters the foreground. Off by default —
+    /// hosts that manage their own badge state should leave this off.
+    public var autoClearBadgeOnForeground: Bool = false
+
     /// Additional URL schemes the SDK is allowed to open when falling back to
     /// UIApplication.shared.open. The "https" scheme is always allowed. Add other schemes as
     /// bare scheme names (e.g. "myapp", "tel", "sms" — not "myapp://"). Matching is

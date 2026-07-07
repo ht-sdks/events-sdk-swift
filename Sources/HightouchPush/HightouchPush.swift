@@ -79,6 +79,7 @@ public final class HightouchPush {
         _config = normalizeConfig(config)
         _currentUserId = a.userId
         _apnsToken = UserDefaults.standard.data(forKey: apnsTokenKey)
+        configureBadgeFeatures(config: config)
     }
 
     /// Initialize with an existing Analytics instance.
@@ -96,6 +97,7 @@ public final class HightouchPush {
         _config = normalizeConfig(config)
         _currentUserId = analytics.userId
         _apnsToken = UserDefaults.standard.data(forKey: apnsTokenKey)
+        configureBadgeFeatures(config: config)
     }
 }
 

@@ -6,14 +6,7 @@ struct SettingsView: View {
     @State private var writeKey: String = ""
     @State private var apiHost: String = ""
     @State private var appId: String = ""
-
-    /// Read a config value: UserDefaults override first, then Info.plist build-time default.
-    private static func configValue(userDefaultsKey: String, plistKey: String) -> String {
-        if let saved = UserDefaults.standard.string(forKey: userDefaultsKey), !saved.isEmpty {
-            return saved
-        }
-        return Bundle.main.infoDictionary?[plistKey] as? String ?? ""
-    }
+    @State private var autoClearBadgeOnForeground: Bool = false
 
     private static var plistWriteKey: String {
         Bundle.main.infoDictionary?["HightouchWriteKey"] as? String ?? ""
@@ -52,6 +45,9 @@ struct SettingsView: View {
                 .autocorrectionDisabled()
                 .padding(.horizontal)
 
+            Toggle("Auto-clear badge on foreground", isOn: $autoClearBadgeOnForeground)
+                .padding(.horizontal)
+
             Button("Save & Connect") {
                 let trimmedKey = writeKey.trimmingCharacters(in: .whitespaces)
                 let trimmedHost = apiHost.trimmingCharacters(in: .whitespaces)
@@ -61,9 +57,13 @@ struct SettingsView: View {
                 // means the default region endpoint).
                 guard !trimmedKey.isEmpty, !trimmedAppId.isEmpty else { return }
 
-                UserDefaults.standard.set(trimmedKey, forKey: "ht_write_key")
-                UserDefaults.standard.set(trimmedHost, forKey: "ht_api_host")
-                UserDefaults.standard.set(trimmedAppId, forKey: "ht_app_id")
+                UserDefaults.standard.set(trimmedKey, forKey: PushTestAppConfig.writeKeyDefaultsKey)
+                UserDefaults.standard.set(trimmedHost, forKey: PushTestAppConfig.apiHostDefaultsKey)
+                UserDefaults.standard.set(trimmedAppId, forKey: PushTestAppConfig.appIdDefaultsKey)
+                UserDefaults.standard.set(
+                    autoClearBadgeOnForeground,
+                    forKey: PushTestAppConfig.autoClearBadgeDefaultsKey
+                )
 
                 // NOTE: This replaces the previous Analytics instance without flushing it.
                 // Any in-flight events on the old pipeline will be orphaned. Acceptable for
@@ -71,7 +71,8 @@ struct SettingsView: View {
                 AppDelegate.initializeHightouchPush(
                     writeKey: trimmedKey,
                     apiHost: trimmedHost,
-                    appId: trimmedAppId
+                    appId: trimmedAppId,
+                    autoClearBadgeOnForeground: autoClearBadgeOnForeground
                 )
                 isConfigured = true
                 dismiss()
@@ -84,20 +85,23 @@ struct SettingsView: View {
 
             if hasDefaults {
                 Button("Reset to Defaults") {
-                    UserDefaults.standard.removeObject(forKey: "ht_write_key")
-                    UserDefaults.standard.removeObject(forKey: "ht_api_host")
-                    UserDefaults.standard.removeObject(forKey: "ht_app_id")
+                    UserDefaults.standard.removeObject(forKey: PushTestAppConfig.writeKeyDefaultsKey)
+                    UserDefaults.standard.removeObject(forKey: PushTestAppConfig.apiHostDefaultsKey)
+                    UserDefaults.standard.removeObject(forKey: PushTestAppConfig.appIdDefaultsKey)
+                    UserDefaults.standard.removeObject(forKey: PushTestAppConfig.autoClearBadgeDefaultsKey)
                     writeKey = Self.plistWriteKey
                     apiHost = Self.plistApiHost
                     appId = Self.plistAppId
+                    autoClearBadgeOnForeground = false
                 }
                 .foregroundColor(.secondary)
             }
         }
         .onAppear {
-            writeKey = Self.configValue(userDefaultsKey: "ht_write_key", plistKey: "HightouchWriteKey")
-            apiHost = Self.configValue(userDefaultsKey: "ht_api_host", plistKey: "HightouchApiHost")
-            appId = Self.configValue(userDefaultsKey: "ht_app_id", plistKey: "HightouchAppId")
+            writeKey = PushTestAppConfig.writeKey
+            apiHost = PushTestAppConfig.apiHost
+            appId = PushTestAppConfig.appId
+            autoClearBadgeOnForeground = PushTestAppConfig.autoClearBadgeOnForeground
         }
     }
 }

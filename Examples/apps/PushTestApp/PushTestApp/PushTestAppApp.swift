@@ -2,26 +2,47 @@ import SwiftUI
 import Hightouch
 import HightouchPush
 
+/// Single source of truth for the app's stored configuration: UserDefaults override first,
+/// then Info.plist build-time default.
+enum PushTestAppConfig {
+    static let writeKeyDefaultsKey = "ht_write_key"
+    static let apiHostDefaultsKey = "ht_api_host"
+    static let appIdDefaultsKey = "ht_app_id"
+    static let autoClearBadgeDefaultsKey = "ht_auto_clear_badge_on_foreground"
+
+    static func value(userDefaultsKey: String, plistKey: String) -> String {
+        if let saved = UserDefaults.standard.string(forKey: userDefaultsKey), !saved.isEmpty {
+            return saved
+        }
+        return Bundle.main.infoDictionary?[plistKey] as? String ?? ""
+    }
+
+    static var writeKey: String {
+        value(userDefaultsKey: writeKeyDefaultsKey, plistKey: "HightouchWriteKey")
+    }
+
+    static var apiHost: String {
+        value(userDefaultsKey: apiHostDefaultsKey, plistKey: "HightouchApiHost")
+    }
+
+    static var appId: String {
+        value(userDefaultsKey: appIdDefaultsKey, plistKey: "HightouchAppId")
+    }
+
+    static var autoClearBadgeOnForeground: Bool {
+        UserDefaults.standard.bool(forKey: autoClearBadgeDefaultsKey)
+    }
+}
+
 @main
 struct PushTestAppApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @State private var isLoggedIn = false
-    @State private var isConfigured: Bool = {
-        // Both writeKey and appId are required — an empty appId silently breaks push
-        // association, so it can't be treated as "configured."
-        let savedWriteKey = UserDefaults.standard.string(forKey: "ht_write_key")?.trimmingCharacters(in: .whitespaces) ?? ""
-        let savedAppId = UserDefaults.standard.string(forKey: "ht_app_id")?.trimmingCharacters(in: .whitespaces) ?? ""
-        if !savedWriteKey.isEmpty, !savedAppId.isEmpty {
-            return true
-        }
-        // Also consider configured if build-time defaults are present in Info.plist
-        let plistWriteKey = Bundle.main.infoDictionary?["HightouchWriteKey"] as? String ?? ""
-        let plistAppId = Bundle.main.infoDictionary?["HightouchAppId"] as? String ?? ""
-        if !plistWriteKey.isEmpty, !plistAppId.isEmpty {
-            return true
-        }
-        return false
-    }()
+    // Both writeKey and appId are required — an empty appId silently breaks push
+    // association, so it can't be treated as "configured."
+    @State private var isConfigured: Bool =
+        !PushTestAppConfig.writeKey.trimmingCharacters(in: .whitespaces).isEmpty
+        && !PushTestAppConfig.appId.trimmingCharacters(in: .whitespaces).isEmpty
 
     var body: some Scene {
         WindowGroup {
@@ -62,29 +83,42 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
     ) -> Bool {
         UNUserNotificationCenter.current().delegate = self
 
-        // Initialize from UserDefaults if available, otherwise fall back to Info.plist build-time defaults.
-        let writeKey = UserDefaults.standard.string(forKey: "ht_write_key")
-            ?? Bundle.main.infoDictionary?["HightouchWriteKey"] as? String
-            ?? ""
-        let apiHost = UserDefaults.standard.string(forKey: "ht_api_host")
-            ?? Bundle.main.infoDictionary?["HightouchApiHost"] as? String
-            ?? ""
-        let appId = UserDefaults.standard.string(forKey: "ht_app_id")
-            ?? Bundle.main.infoDictionary?["HightouchAppId"] as? String
-            ?? ""
-
-        if !writeKey.isEmpty, !appId.isEmpty {
-            AppDelegate.initializeHightouchPush(writeKey: writeKey, apiHost: apiHost, appId: appId)
-        }
+        _ = AppDelegate.initializeFromStoredConfig()
         // apiHost stays optional (empty = default region). If writeKey or appId is missing,
         // SettingsView will call initializeHightouchPush after the user enters config.
 
         return true
     }
 
-    static func initializeHightouchPush(writeKey: String, apiHost: String, appId: String) {
+    /// (Re)initialize from stored config. Preserves the currently identified test user across
+    /// re-initialization so toggling config (e.g. auto-clear badge) doesn't log the user out.
+    @discardableResult
+    static func initializeFromStoredConfig() -> Bool {
+        let writeKey = PushTestAppConfig.writeKey
+        let appId = PushTestAppConfig.appId
+        guard !writeKey.isEmpty, !appId.isEmpty else { return false }
+        let currentUserId = HightouchPush.userId
+        initializeHightouchPush(
+            writeKey: writeKey,
+            apiHost: PushTestAppConfig.apiHost,
+            appId: appId,
+            autoClearBadgeOnForeground: PushTestAppConfig.autoClearBadgeOnForeground
+        )
+        if let currentUserId {
+            HightouchPush.identify(userId: currentUserId)
+        }
+        return true
+    }
+
+    static func initializeHightouchPush(
+        writeKey: String,
+        apiHost: String,
+        appId: String,
+        autoClearBadgeOnForeground: Bool
+    ) {
         var pushConfig = HightouchPushConfig(appId: appId)
         pushConfig.silentPushDelegate = silentPushHandler
+        pushConfig.autoClearBadgeOnForeground = autoClearBadgeOnForeground
 
         let analyticsConfig = Configuration(writeKey: writeKey)
             .trackApplicationLifecycleEvents(true)
