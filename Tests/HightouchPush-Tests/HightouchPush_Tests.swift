@@ -160,4 +160,95 @@ final class HightouchPush_Tests: XCTestCase {
     func testNormalizeSchemeLowercasesAndTrims() {
         XCTAssertEqual(HightouchPush.normalizeScheme("  MyApp  "), "myapp")
     }
+
+    // MARK: - HightouchPush.shouldUploadToken (register dedupe + heartbeat decision)
+
+    private let interval: TimeInterval = 24 * 60 * 60
+
+    func testShouldUploadWhenTokenChangedEvenWithinInterval() {
+        XCTAssertTrue(HightouchPush.shouldUploadToken(
+            tokenChanged: true,
+            lastUploadedAt: 1_000,
+            now: 1_000,
+            interval: interval
+        ))
+    }
+
+    func testShouldNotUploadWhenTokenUnchangedWithinInterval() {
+        let now = interval * 10
+        XCTAssertFalse(HightouchPush.shouldUploadToken(
+            tokenChanged: false,
+            lastUploadedAt: now - (interval - 1),
+            now: now,
+            interval: interval
+        ))
+    }
+
+    func testShouldUploadWhenTokenUnchangedButIntervalElapsed() {
+        let now = interval * 10
+        XCTAssertTrue(HightouchPush.shouldUploadToken(
+            tokenChanged: false,
+            lastUploadedAt: now - interval,
+            now: now,
+            interval: interval
+        ))
+    }
+
+    func testShouldUploadWhenNeverUploadedBefore() {
+        // lastUploadedAt == 0 (the UserDefaults default) always uploads because a real epoch `now`
+        // dwarfs any interval.
+        XCTAssertTrue(HightouchPush.shouldUploadToken(
+            tokenChanged: false,
+            lastUploadedAt: 0,
+            now: Date().timeIntervalSince1970,
+            interval: interval
+        ))
+    }
+
+    // MARK: - HightouchPush.clampTokenUploadInterval
+
+    func testClampRaisesSubMinimumIntervalToMinimum() {
+        XCTAssertEqual(
+            HightouchPush.clampTokenUploadInterval(5 * 60),
+            HightouchPushConfig.minTokenUploadInterval
+        )
+    }
+
+    func testClampPreservesIntervalAtOrAboveMinimum() {
+        let sevenDays: TimeInterval = 7 * 24 * 60 * 60
+        XCTAssertEqual(HightouchPush.clampTokenUploadInterval(sevenDays), sevenDays)
+    }
+
+    func testDefaultIntervalIsAboveMinimum() {
+        XCTAssertGreaterThanOrEqual(
+            HightouchPushConfig.defaultTokenUploadInterval,
+            HightouchPushConfig.minTokenUploadInterval
+        )
+    }
+
+    // MARK: - Foreground heartbeat observer (iOS only)
+
+    #if os(iOS) || targetEnvironment(macCatalyst)
+    func testInitializeRegistersForegroundHeartbeatObserver() {
+        HightouchPush.initialize(
+            configuration: Configuration(writeKey: "test-heartbeat-observer"),
+            config: HightouchPushConfig(appId: "test-heartbeat-observer")
+        )
+
+        XCTAssertTrue(HightouchPush.isForegroundHeartbeatObserverRegistered)
+    }
+
+    func testForegroundHeartbeatObserverRegistrationIsIdempotent() {
+        HightouchPush.initialize(
+            configuration: Configuration(writeKey: "test-heartbeat-idempotent-1"),
+            config: HightouchPushConfig(appId: "test-heartbeat-idempotent")
+        )
+        HightouchPush.initialize(
+            configuration: Configuration(writeKey: "test-heartbeat-idempotent-2"),
+            config: HightouchPushConfig(appId: "test-heartbeat-idempotent")
+        )
+
+        XCTAssertTrue(HightouchPush.isForegroundHeartbeatObserverRegistered)
+    }
+    #endif
 }
