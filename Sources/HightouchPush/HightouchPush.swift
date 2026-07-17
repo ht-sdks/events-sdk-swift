@@ -28,7 +28,9 @@ public final class HightouchPush {
     }
     private static var _apnsToken: Data?
     private static var _currentUserId: String?
+    #if os(iOS) || targetEnvironment(macCatalyst)
     private static var foregroundHeartbeatObserverToken: NSObjectProtocol?
+    #endif
 
     /// Set by `identify(...)` so the OS `didRegister` callback it triggers always re-uploads,
     /// even within the heartbeat interval — a login must (re)associate the token with the new user.
