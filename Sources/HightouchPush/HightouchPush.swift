@@ -9,6 +9,7 @@ public final class HightouchPush {
     private init() {}
 
     private static let apnsTokenKey = "com.hightouch.push.apnsToken"
+    private static let lastTokenUploadAtKey = "com.hightouch.push.lastTokenUploadAt"
 
     // NOTE: Thread safety — these static vars are not synchronized. In practice, identify(),
     // logout(), and register() are called from single callsites (login button, logout button,
@@ -22,8 +23,18 @@ public final class HightouchPush {
     static var silentPushDelegate: (any HightouchSilentPushDelegate)? { _config?.silentPushDelegate }
     static var allowedProtocols: [String] { _config?.allowedProtocols ?? [] }
     static var appId: String { _config?.appId ?? "" }
+    static var tokenUploadInterval: TimeInterval {
+        _config?.tokenUploadInterval ?? HightouchPushConfig.defaultTokenUploadInterval
+    }
     private static var _apnsToken: Data?
     private static var _currentUserId: String?
+    #if os(iOS) || targetEnvironment(macCatalyst)
+    private static var foregroundHeartbeatObserverToken: NSObjectProtocol?
+    #endif
+
+    /// Set by `identify(...)` so the next `register` re-uploads even within the heartbeat interval
+    /// (a login must re-associate the token). Cleared by that `register(token:)`.
+    private static var _forceUploadNextRegister = false
 
     static var analytics: Analytics {
         if let a = _analytics {
@@ -49,11 +60,18 @@ public final class HightouchPush {
     }
 
     /// Returns a copy of the push config with `allowedProtocols` canonicalized to lowercased,
-    /// trimmed scheme names. Applied when the config enters the SDK so every reader sees clean data.
+    /// trimmed scheme names, and `tokenUploadInterval` clamped to its minimum. Applied when the
+    /// config enters the SDK so every reader sees clean data.
     private static func normalizeConfig(_ config: HightouchPushConfig) -> HightouchPushConfig {
         var normalized = config
         normalized.allowedProtocols = config.allowedProtocols.map(normalizeScheme)
+        normalized.tokenUploadInterval = clampTokenUploadInterval(config.tokenUploadInterval)
         return normalized
+    }
+
+    /// Clamps a configured interval up to `HightouchPushConfig.minTokenUploadInterval`.
+    static func clampTokenUploadInterval(_ interval: TimeInterval) -> TimeInterval {
+        return max(interval, HightouchPushConfig.minTokenUploadInterval)
     }
 
     /// Initialize with an analytics `Configuration`. HightouchPush builds and owns the
@@ -80,6 +98,7 @@ public final class HightouchPush {
         _currentUserId = a.userId
         _apnsToken = UserDefaults.standard.data(forKey: apnsTokenKey)
         configureBadgeFeatures(config: config)
+        configureForegroundHeartbeat()
     }
 
     /// Initialize with an existing Analytics instance.
@@ -98,6 +117,7 @@ public final class HightouchPush {
         _currentUserId = analytics.userId
         _apnsToken = UserDefaults.standard.data(forKey: apnsTokenKey)
         configureBadgeFeatures(config: config)
+        configureForegroundHeartbeat()
     }
 }
 
@@ -110,16 +130,17 @@ extension HightouchPush {
     /// callback fires automatically on every login — no manual call needed on login.
     ///
     /// What this does:
-    /// 1. Stores the token and calls analytics.setDeviceToken(_:) so it is attached to all
-    ///    subsequent events via context.device.token.
-    /// 2. Always fires track("CEP Push Token Events") with provider_event_type "registered",
-    ///    carrying the token, anonymousId, and userId (if set). This is the primary signal that
-    ///    associates the token with the device/user — both for anonymous devices (pre-login)
-    ///    and identified users.
+    /// 1. Stores the token and calls analytics.setDeviceToken(_:) on every call, so events stay
+    ///    tagged via context.device.token.
+    /// 2. Fires track("CEP Push Token Events") "registered" — deduped, since iOS re-fires this per
+    ///    launch: only when the token changed or the heartbeat interval elapsed (see
+    ///    `shouldUploadToken`). `identify(...)` bypasses the dedup so a login always re-associates.
     public static func register(token: Data) {
+        let previousToken = _apnsToken
+        let hexToken = token.map { String(format: "%02x", $0) }.joined()
+
         _apnsToken = token
         UserDefaults.standard.set(token, forKey: apnsTokenKey)
-        let hexToken = token.map { String(format: "%02x", $0) }.joined()
 
         #if os(iOS) || targetEnvironment(macCatalyst)
         analytics.registeredForRemoteNotifications(deviceToken: token)
@@ -127,11 +148,37 @@ extension HightouchPush {
         analytics.setDeviceToken(hexToken)
         #endif
 
+        let forceUpload = _forceUploadNextRegister
+        _forceUploadNextRegister = false
+
+        let now = Date().timeIntervalSince1970
+        let lastUploadedAt = UserDefaults.standard.double(forKey: lastTokenUploadAtKey)
+        let shouldUpload = forceUpload || shouldUploadToken(
+            tokenChanged: previousToken != token,
+            lastUploadedAt: lastUploadedAt,
+            now: now,
+            interval: tokenUploadInterval
+        )
+        guard shouldUpload else { return }
+
+        UserDefaults.standard.set(now, forKey: lastTokenUploadAtKey)
         CepEventTracking.track(name: CepEventTracking.pushTokenEvents, properties: [
             "provider_event_type": CepEventTracking.tokenRegistered,
             "token": hexToken,
             "platform": "ios",
         ])
+    }
+
+    /// Re-upload when the token changed since the last upload, or the heartbeat interval has
+    /// elapsed. A `lastUploadedAt` of `0` (never uploaded) always uploads, since a real epoch `now`
+    /// dwarfs the interval.
+    static func shouldUploadToken(
+        tokenChanged: Bool,
+        lastUploadedAt: TimeInterval,
+        now: TimeInterval,
+        interval: TimeInterval
+    ) -> Bool {
+        return tokenChanged || (now - lastUploadedAt) >= interval
     }
 }
 
@@ -197,6 +244,9 @@ extension HightouchPush {
         _currentUserId = userId
 
         #if os(iOS) || targetEnvironment(macCatalyst)
+        // The OS re-fires didRegister (→ register) with the same token; force that upload past the
+        // heartbeat dedup so the token is re-associated with the new user.
+        _forceUploadNextRegister = true
         DispatchQueue.main.async {
             UIApplication.shared.registerForRemoteNotifications()
         }
@@ -243,4 +293,37 @@ extension HightouchPush {
         _currentUserId = nil
         analytics.reset()
     }
+}
+
+extension HightouchPush {
+
+    #if os(iOS) || targetEnvironment(macCatalyst)
+    /// Whether the app-foreground token-upload heartbeat observer is registered.
+    static var isForegroundHeartbeatObserverRegistered: Bool {
+        foregroundHeartbeatObserverToken != nil
+    }
+
+    /// Observe app-foreground so the heartbeat also fires when a long-lived process returns to the
+    /// foreground past the TTL, not only on launch. Still gated by `register`'s dedup, so
+    /// foregrounds within the interval are no-ops. Registered once from initialize(); idempotent.
+    static func configureForegroundHeartbeat() {
+        guard foregroundHeartbeatObserverToken == nil else { return }
+        foregroundHeartbeatObserverToken = NotificationCenter.default.addObserver(
+            forName: UIApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            HightouchPush.handleForegroundHeartbeat()
+        }
+    }
+
+    /// Re-affirm the cached APNs token through the dedup gate on foreground. A no-op until a token
+    /// has been delivered — the OS `didRegister` callback handles the first upload.
+    static func handleForegroundHeartbeat() {
+        guard let token = _apnsToken else { return }
+        register(token: token)
+    }
+    #else
+    static func configureForegroundHeartbeat() {}
+    #endif
 }
