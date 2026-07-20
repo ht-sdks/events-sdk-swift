@@ -41,21 +41,16 @@ public struct HightouchPushConfig {
     /// and not in this list are dropped after the urlDelegate declines them.
     public var allowedProtocols: [String] = []
 
-    /// How long a token registration stays "fresh" before `register(token:)` re-uploads it,
-    /// even when the APNs token is unchanged. This heartbeat keeps the server's `last_seen_at` a
-    /// real liveness signal and lets a token that was wrongly invalidated (e.g. by the uninstall
-    /// probe) self-revive on the next launch past this interval.
-    ///
-    /// Defaults to `defaultTokenUploadInterval` (24h) and is clamped up to
-    /// `minTokenUploadInterval` (12h) when the SDK ingests the config — a shorter interval would
-    /// risk re-uploading on every launch. There is intentionally no way to disable it:
-    /// dedupe-forever is the failure mode this heartbeat removes.
+    /// How long a token registration stays "fresh" before `register(token:)` re-uploads it even
+    /// when the APNs token is unchanged, keeping the server's `last_seen_at` a real liveness signal.
+    /// Defaults to 24h, clamped up to a 12h minimum when the SDK ingests the config; there is
+    /// intentionally no way to disable it.
     public var tokenUploadInterval: TimeInterval = HightouchPushConfig.defaultTokenUploadInterval
 
-    /// Default token re-upload heartbeat interval: 24h, matching Airship.
+    /// Default heartbeat interval (24h).
     public static let defaultTokenUploadInterval: TimeInterval = 24 * 60 * 60
 
-    /// Lower bound the heartbeat interval is clamped to, to avoid per-launch re-uploads.
+    /// Lower bound the interval is clamped to, to avoid per-launch re-uploads.
     public static let minTokenUploadInterval: TimeInterval = 12 * 60 * 60
 
     public init(appId: String) {

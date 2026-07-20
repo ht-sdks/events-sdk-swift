@@ -2,14 +2,11 @@ import XCTest
 @testable import Hightouch
 @testable import HightouchPush
 
-/// On-device (simulator) integration tests that drive the real `HightouchPush.register(token:)`
-/// against a real `Analytics` instance, verifying the dedupe + TTL-heartbeat gating.
-///
-/// Uploads are confirmed two ways: an `OutputReaderPlugin` captures the `CEP Push Token Events`
-/// actually dispatched through the analytics timeline, and the persisted
-/// `com.hightouch.push.lastTokenUploadAt` timestamp (written only when `register` uploads) is
-/// checked as the cache/dedupe signal. This mirrors the Android emulator verification, which reads
-/// `last_uploaded_at_millis` from SharedPreferences.
+/// Integration tests that drive the real `HightouchPush.register(token:)` against a real
+/// `Analytics`, verifying the dedupe + TTL-heartbeat gating. Uploads are confirmed two ways: an
+/// `OutputReaderPlugin` captures the dispatched `CEP Push Token Events`, and the persisted
+/// `com.hightouch.push.lastTokenUploadAt` timestamp (written only when `register` uploads) is the
+/// dedupe/cache signal.
 final class HightouchPushRegisterIntegration_Tests: XCTestCase {
 
     private let lastUploadKey = "com.hightouch.push.lastTokenUploadAt"
@@ -98,9 +95,8 @@ final class HightouchPushRegisterIntegration_Tests: XCTestCase {
         HightouchPush.register(token: tokenA)
         XCTAssertEqual(uploadCount, 1)
 
-        // identify() sets the one-shot bypass and asks the OS to re-fire didRegister. Simulate that
-        // OS callback with the same token inside the TTL window: it must still dispatch so the token
-        // is re-associated with the new user.
+        // identify() sets the one-shot bypass; simulate the OS re-firing didRegister with the same
+        // token inside the TTL window — it must still dispatch to re-associate the token.
         HightouchPush.identify(userId: "reg-integration-user")
         HightouchPush.register(token: tokenA)
 
