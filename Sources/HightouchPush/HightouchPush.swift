@@ -92,13 +92,7 @@ public final class HightouchPush {
         configuration: Configuration,
         config: HightouchPushConfig
     ) {
-        let a = Analytics(configuration: configuration)
-        _analytics = a
-        _config = normalizeConfig(config)
-        _currentUserId = a.userId
-        _apnsToken = UserDefaults.standard.data(forKey: apnsTokenKey)
-        configureBadgeFeatures(config: config)
-        configureForegroundHeartbeat()
+        initInternal(analytics: Analytics(configuration: configuration), config: config)
     }
 
     /// Initialize with an existing Analytics instance.
@@ -112,12 +106,29 @@ public final class HightouchPush {
         analytics: Analytics,
         config: HightouchPushConfig
     ) {
+        initInternal(analytics: analytics, config: config)
+    }
+
+    private static func initInternal(analytics: Analytics, config: HightouchPushConfig) {
         _analytics = analytics
         _config = normalizeConfig(config)
         _currentUserId = analytics.userId
         _apnsToken = UserDefaults.standard.data(forKey: apnsTokenKey)
+        // Arm the analytics device-token plugin from the cached token so events fired before
+        // the OS re-delivers the token this launch — e.g. an "opened" tracked from a
+        // cold-start notification tap — still carry context.device.token. register(token:)
+        // overwrites it when the didRegister callback fires.
+        if let token = _apnsToken {
+            analytics.setDeviceToken(hexEncode(token))
+        }
         configureBadgeFeatures(config: config)
         configureForegroundHeartbeat()
+    }
+
+    /// Hex-encode an APNs token for the wire. (The core module's `Data.hexString` is
+    /// internal to the Hightouch module, so HightouchPush carries its own.)
+    static func hexEncode(_ token: Data) -> String {
+        token.map { String(format: "%02x", $0) }.joined()
     }
 }
 
@@ -137,7 +148,7 @@ extension HightouchPush {
     ///    `shouldUploadToken`). `identify(...)` bypasses the dedup so a login always re-associates.
     public static func register(token: Data) {
         let previousToken = _apnsToken
-        let hexToken = token.map { String(format: "%02x", $0) }.joined()
+        let hexToken = hexEncode(token)
 
         _apnsToken = token
         UserDefaults.standard.set(token, forKey: apnsTokenKey)
@@ -282,7 +293,7 @@ extension HightouchPush {
         guard _currentUserId != nil else { return }
 
         if let token = _apnsToken {
-            let hexToken = token.map { String(format: "%02x", $0) }.joined()
+            let hexToken = hexEncode(token)
             CepEventTracking.track(name: CepEventTracking.pushTokenEvents, properties: [
                 "provider_event_type": CepEventTracking.tokenDisabled,
                 "token": hexToken,
