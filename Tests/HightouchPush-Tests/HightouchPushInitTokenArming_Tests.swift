@@ -2,17 +2,15 @@ import XCTest
 @testable import Hightouch
 @testable import HightouchPush
 
-/// Verifies that `initialize` arms the analytics device-token plugin from the APNs token cached
-/// in UserDefaults, so events dispatched before the OS re-delivers the token this launch (e.g.
-/// an "opened" tracked from a cold-start notification tap) still carry `context.device.token`.
+/// `initialize` arms the device-token plugin from the cached APNs token, so cold-start
+/// events still carry `context.device.token`.
 final class HightouchPushInitTokenArming_Tests: XCTestCase {
 
     private let apnsKey = "com.hightouch.push.apnsToken"
     private let lastUploadKey = "com.hightouch.push.lastTokenUploadAt"
     private let cachedToken = Data([0xde, 0xad, 0xbe, 0xef])
 
-    /// `HightouchPush.analytics` hard-asserts when uninitialized, so tearDown may only touch
-    /// it after a test actually initialized.
+    /// `HightouchPush.analytics` hard-asserts when uninitialized; guards tearDown.
     private var initialized = false
 
     override func tearDown() {
@@ -24,9 +22,8 @@ final class HightouchPushInitTokenArming_Tests: XCTestCase {
         super.tearDown()
     }
 
-    /// Initialize with a per-test write key (storage isolation) and return an output reader
-    /// capturing dispatched events. Token seeding must happen BEFORE this is called — arming
-    /// reads UserDefaults during initialize.
+    /// Initialize with a per-test write key and attach an output reader. Seed the token
+    /// cache BEFORE calling — arming reads UserDefaults during initialize.
     private func initializeAndAttachOutput() -> OutputReaderPlugin {
         initialized = true
         HightouchPush.initialize(

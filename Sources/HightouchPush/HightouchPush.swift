@@ -114,10 +114,8 @@ public final class HightouchPush {
         _config = normalizeConfig(config)
         _currentUserId = analytics.userId
         _apnsToken = UserDefaults.standard.data(forKey: apnsTokenKey)
-        // Arm the analytics device-token plugin from the cached token so events fired before
-        // the OS re-delivers the token this launch — e.g. an "opened" tracked from a
-        // cold-start notification tap — still carry context.device.token. register(token:)
-        // overwrites it when the didRegister callback fires.
+        // Arm the device-token plugin from the cache so events fired before the OS
+        // re-delivers the token (e.g. a cold-start notification-tap open) still carry it.
         if let token = _apnsToken {
             analytics.setDeviceToken(hexEncode(token))
         }
@@ -125,8 +123,7 @@ public final class HightouchPush {
         configureForegroundHeartbeat()
     }
 
-    /// Hex-encode an APNs token for the wire. (The core module's `Data.hexString` is
-    /// internal to the Hightouch module, so HightouchPush carries its own.)
+    /// Hex-encode an APNs token (core's `Data.hexString` is module-internal).
     static func hexEncode(_ token: Data) -> String {
         token.map { String(format: "%02x", $0) }.joined()
     }
