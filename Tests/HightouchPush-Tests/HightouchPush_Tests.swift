@@ -226,6 +226,14 @@ final class HightouchPush_Tests: XCTestCase {
         )
     }
 
+    // MARK: - HightouchPush.hexEncode
+
+    func testHexEncode() {
+        XCTAssertEqual(HightouchPush.hexEncode(Data([0xde, 0xad, 0xbe, 0xef])), "deadbeef")
+        XCTAssertEqual(HightouchPush.hexEncode(Data([0x00, 0x0f])), "000f")
+        XCTAssertEqual(HightouchPush.hexEncode(Data()), "")
+    }
+
     // MARK: - Foreground heartbeat observer (iOS only)
 
     #if os(iOS) || targetEnvironment(macCatalyst)
