@@ -52,8 +52,6 @@ extension ObjCAnalytics {
     /// Associate a user with their unique ID and record traits about them.
     /// - Parameters:
     ///   - userId: A database ID (or email address) for this user.
-    ///     For more information on how we generate the UUID and Apple's policies on IDs, see
-    ///     https://segment.io/libraries/ios#ids
     /// In the case when user logs out, make sure to call ``reset()`` to clear user's identity info.
     @objc(identify:)
     public func identify(userId: String) {
@@ -63,8 +61,6 @@ extension ObjCAnalytics {
     /// Associate a user with their unique ID and record traits about them.
     /// - Parameters:
     ///   - userId: A database ID (or email address) for this user.
-    ///     For more information on how we generate the UUID and Apple's policies on IDs, see
-    ///     https://segment.io/libraries/ios#ids
     ///   - traits: A dictionary of traits you know about the user. Things like: email, name, plan, etc.
     /// In the case when user logs out, make sure to call ``reset()`` to clear user's identity info.
     @objc(identify:traits:)
