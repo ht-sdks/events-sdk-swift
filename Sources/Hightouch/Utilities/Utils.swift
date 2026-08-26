@@ -58,3 +58,20 @@ extension Optional: Flattenable {
     }
 }
 
+extension Dictionary where Key == String, Value == Any {
+    /// Recursively merges `overlay` onto this dictionary. Nested maps are merged;
+    /// all other values (including arrays) are replaced by `overlay`.
+    internal func deepMerged(_ overlay: [String: Any]) -> [String: Any] {
+        var result = self
+        for (key, overlayValue) in overlay {
+            if let overlayDict = overlayValue as? [String: Any],
+               let baseDict = result[key] as? [String: Any] {
+                result[key] = baseDict.deepMerged(overlayDict)
+            } else {
+                result[key] = overlayValue
+            }
+        }
+        return result
+    }
+}
+

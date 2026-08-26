@@ -295,7 +295,12 @@ extension RawEvent {
         guard let userInfo: UserInfo = store.currentState() else { return self }
         
         result.anonymousId = userInfo.anonymousId
-        result.userId = userInfo.userId
+        // Keep an already-set userId (alias/identify) so overlapping calls cannot
+        // pick up another thread's store value. Track/screen/group still inherit
+        // the current identity when userId is nil.
+        if result.userId == nil {
+            result.userId = userInfo.userId
+        }
         result.messageId = UUID().uuidString
         result.timestamp = Date().iso8601()
         result.integrations = try? JSON([String: Any]())
