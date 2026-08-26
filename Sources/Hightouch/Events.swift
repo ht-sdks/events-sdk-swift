@@ -38,7 +38,9 @@ extension Analytics {
     ///   - userId: A database ID for this user. If you don't have a userId
     ///     but want to record traits, just pass traits into the event and they will be associated
     ///     with the anonymousId of that user.  In the case when user logs out, make sure to
-    ///     call ``reset()`` to clear the user's identity info.
+    ///     call ``reset()`` to clear the user's identity info. For more information on how we
+    ///     generate the UUID and Apple's policies on IDs, see
+    ///      https://segment.io/libraries/ios#ids
     /// - traits: A dictionary of traits you know about the user. Things like: email, name, plan, etc.
     public func identify<T: Codable>(userId: String, traits: T?) {
         do {
@@ -74,6 +76,8 @@ extension Analytics {
     /// Associate a user with their unique ID and record traits about them.
     /// - Parameters:
     ///   - userId: A database ID for this user.
+    ///     For more information on how we generate the UUID and Apple's policies on IDs, see
+    ///     https://segment.io/libraries/ios#ids
     /// In the case when user logs out, make sure to call ``reset()`` to clear user's identity info.
     public func identify(userId: String) {
         let event = IdentifyEvent(userId: userId, traits: nil)
@@ -134,7 +138,9 @@ extension Analytics {
     ///   - userId: A database ID for this user. If you don't have a userId
     ///     but want to record traits, just pass traits into the event and they will be associated
     ///     with the anonymousId of that user.  In the case when user logs out, make sure to
-    ///     call ``reset()`` to clear the user's identity info.
+    ///     call ``reset()`` to clear the user's identity info. For more information on how we
+    ///     generate the UUID and Apple's policies on IDs, see
+    ///      https://segment.io/libraries/ios#ids
     ///   - properties: A dictionary of traits you know about the user. Things like: email, name, plan, etc.
     public func track(name: String, properties: [String: Any]? = nil) {
         var props: JSON? = nil
@@ -154,7 +160,9 @@ extension Analytics {
     ///   - userId: A database ID for this user. If you don't have a userId
     ///     but want to record traits, just pass traits into the event and they will be associated
     ///     with the anonymousId of that user.  In the case when user logs out, make sure to
-    ///     call ``reset()`` to clear the user's identity info.
+    ///     call ``reset()`` to clear the user's identity info. For more information on how we
+    ///     generate the UUID and Apple's policies on IDs, see
+    ///      https://segment.io/libraries/ios#ids
     ///   - traits: A dictionary of traits you know about the user. Things like: email, name, plan, etc.
     /// In the case when user logs out, make sure to call ``reset()`` to clear user's identity info.
     public func identify(userId: String, traits: [String: Any]? = nil) {
