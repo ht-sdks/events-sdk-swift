@@ -126,31 +126,6 @@ class OutputReaderPlugin: Plugin {
     }
 }
 
-/// Thread-safe collector for every event type. Used when tests need alias/identify/etc
-/// or overlapping calls from multiple queues.
-class AllEventsReaderPlugin: Plugin {
-    let type: PluginType = .after
-    var analytics: Analytics?
-
-    private let lock = NSLock()
-    private var _events = [RawEvent]()
-
-    var events: [RawEvent] {
-        lock.lock()
-        defer { lock.unlock() }
-        return _events
-    }
-
-    func execute<T>(event: T?) -> T? where T : RawEvent {
-        if let event = event {
-            lock.lock()
-            _events.append(event)
-            lock.unlock()
-        }
-        return event
-    }
-}
-
 func waitUntilStarted(analytics: Analytics?) {
     guard let analytics = analytics else { return }
     // wait until the startup queue has emptied it's events.

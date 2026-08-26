@@ -35,18 +35,13 @@ public class ObjCAnalytics: NSObject {
 extension ObjCAnalytics {
     @objc(track:)
     public func track(name: String) {
-        track(name: name, properties: nil, context: nil)
+        track(name: name, properties: nil)
     }
     
 
     @objc(track:properties:)
     public func track(name: String, properties: [String: Any]?) {
-        track(name: name, properties: properties, context: nil)
-    }
-
-    @objc(track:properties:context:)
-    public func track(name: String, properties: [String: Any]?, context: [String: Any]?) {
-        analytics.track(name: name, properties: properties, context: context)
+        analytics.track(name: name, properties: properties)
     }
 
     /// Associate a user with their unique ID and record traits about them.
@@ -69,21 +64,16 @@ extension ObjCAnalytics {
     /// In the case when user logs out, make sure to call ``reset()`` to clear user's identity info.
     @objc(identify:traits:)
     public func identify(userId: String?, traits: [String: Any]?) {
-        identify(userId: userId, traits: traits, context: nil)
-    }
-
-    @objc(identify:traits:context:)
-    public func identify(userId: String?, traits: [String: Any]?, context: [String: Any]?) {
         if let userId = userId {
             // at first glance this looks like recursion.  It's actually calling
             // into the swift version of this call where userId is NOT optional.
-            analytics.identify(userId: userId, traits: traits, context: context)
+            analytics.identify(userId: userId, traits: traits)
         } else if let traits = try? JSON(traits as Any) {
             analytics.store.dispatch(action: UserInfo.SetTraitsAction(traits: traits))
             let userInfo: UserInfo? = analytics.store.currentState()
             let userId = userInfo?.userId
             let event = IdentifyEvent(userId: userId, traits: traits)
-            analytics.process(incomingEvent: event, context: context)
+            analytics.process(incomingEvent: event)
         }
     }
     
@@ -92,7 +82,7 @@ extension ObjCAnalytics {
     ///   - title: The title of the screen being tracked.
     @objc(screen:)
     public func screen(title: String) {
-        screen(title: title, category: nil, properties: nil, context: nil)
+        screen(title: title, category: nil, properties: nil)
     }
     
     /// Track a screen change with a title, category and other properties.
@@ -110,12 +100,7 @@ extension ObjCAnalytics {
     ///   - properties: Any extra metadata associated with the screen. e.g. method of access, size, etc.
     @objc(screen:category:properties:)
     public func screen(title: String, category: String?, properties: [String: Any]?) {
-        screen(title: title, category: category, properties: properties, context: nil)
-    }
-
-    @objc(screen:category:properties:context:)
-    public func screen(title: String, category: String?, properties: [String: Any]?, context: [String: Any]?) {
-        analytics.screen(title: title, category: category, properties: properties, context: context)
+        analytics.screen(title: title, category: category, properties: properties)
     }
 
     /// Associate a user with a group such as a company, organization, project, etc.
@@ -132,12 +117,7 @@ extension ObjCAnalytics {
     ///   - traits: Traits of the group you may be interested in such as email, phone or name.
     @objc(group:traits:)
     public func group(groupId: String, traits: [String: Any]?) {
-        group(groupId: groupId, traits: traits, context: nil)
-    }
-
-    @objc(group:traits:context:)
-    public func group(groupId: String, traits: [String: Any]?, context: [String: Any]?) {
-        analytics.group(groupId: groupId, traits: traits, context: context)
+        analytics.group(groupId: groupId, traits: traits)
     }
     
     @objc(alias:)
@@ -145,12 +125,7 @@ extension ObjCAnalytics {
     /// as one. This is an advanced method, but it is required to manage user identities successfully in some of our destinations.
     /// - Parameter newId: The new id replacing the old user id.
     public func alias(newId: String) {
-        alias(newId: newId, context: nil)
-    }
-
-    @objc(alias:context:)
-    public func alias(newId: String, context: [String: Any]?) {
-        analytics.alias(newId: newId, context: context)
+        analytics.alias(newId: newId)
     }
 }
 

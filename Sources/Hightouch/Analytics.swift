@@ -75,17 +75,9 @@ public class Analytics {
         platformStartup()
     }
     
-    internal func process<E: RawEvent>(incomingEvent: E, context: [String: Any]? = nil) {
+    internal func process<E: RawEvent>(incomingEvent: E) {
         guard enabled == true else { return }
-        var workingEvent = incomingEvent
-        if let context = context {
-            do {
-                workingEvent.context = try JSON(context)
-            } catch {
-                reportInternalError(error, fatal: true)
-            }
-        }
-        let event = workingEvent.applyRawEventData(store: store)
+        let event = incomingEvent.applyRawEventData(store: store)
         
         _ = timeline.process(incomingEvent: event)
         
