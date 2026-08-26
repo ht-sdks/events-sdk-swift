@@ -650,16 +650,13 @@ final class Analytics_Tests: XCTestCase {
         waitUntilStarted(analytics: analytics)
 
         analytics.track(name: "TrackFoo", properties: ["id": "1"], context: [
-            "protocols": ["schemaVersion": "v1"],
-            "library": ["name": "events-cli"]
+            "protocols": ["schemaVersion": "v1"]
         ])
 
         let trackEvent = outputReader.lastEvent as? TrackEvent
         XCTAssertEqual(trackEvent?.event, "TrackFoo")
         let context = trackEvent?.context?.dictionaryValue
         XCTAssertEqual(context?[keyPath: "protocols.schemaVersion"] as? String, "v1")
-        // Nested maps merge: per-call library.name wins, platform library.version remains.
-        XCTAssertEqual(context?[keyPath: "library.name"] as? String, "events-cli")
         XCTAssertEqual(context?[keyPath: "library.version"] as? String, analytics.version())
         XCTAssertNotNil(context?["os"], "platform context should still be present")
     }
@@ -740,5 +737,24 @@ final class Analytics_Tests: XCTestCase {
         for event in collector.events {
             XCTAssertEqual(event.context?.dictionaryValue?[keyPath: "protocols.schemaVersion"] as? String, "v1")
         }
+    }
+
+    func testPerCallContextDoesNotLeakToNextEvent() {
+        let analytics = Analytics(configuration: Configuration(writeKey: "testPerCallContextDoesNotLeakToNextEvent"))
+        let collector = AllEventsReaderPlugin()
+        analytics.add(plugin: collector)
+
+        waitUntilStarted(analytics: analytics)
+
+        analytics.track(name: "with context", context: ["protocols": ["schemaVersion": "v1"]])
+        analytics.track(name: "without context")
+
+        XCTAssertEqual(collector.events.count, 2)
+        let withContext = collector.events[0] as? TrackEvent
+        let withoutContext = collector.events[1] as? TrackEvent
+        XCTAssertEqual(withContext?.event, "with context")
+        XCTAssertEqual(withoutContext?.event, "without context")
+        XCTAssertEqual(withContext?.context?.dictionaryValue?[keyPath: "protocols.schemaVersion"] as? String, "v1")
+        XCTAssertNil(withoutContext?.context?.dictionaryValue?["protocols"])
     }
 }

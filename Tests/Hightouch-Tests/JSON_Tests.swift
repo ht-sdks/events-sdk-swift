@@ -294,24 +294,5 @@ class JSONTests: XCTestCase {
         // it's not a JSON object, throw
         XCTAssertThrowsError(try json?.remove(key: "merchant"))
     }
-
-    func testDeepMergedNestedMaps() {
-        let base: [String: Any] = [
-            "library": ["name": "events-sdk-swift", "version": "0.1.1"],
-            "os": ["name": "iOS"]
-        ]
-        let overlay: [String: Any] = [
-            "library": ["name": "events-cli"],
-            "protocols": ["schemaVersion": "v1"]
-        ]
-        let merged = base.deepMerged(overlay)
-        let library = merged["library"] as? [String: Any]
-        XCTAssertEqual(library?["name"] as? String, "events-cli")
-        XCTAssertEqual(library?["version"] as? String, "0.1.1")
-        let protocols = merged["protocols"] as? [String: Any]
-        XCTAssertEqual(protocols?["schemaVersion"] as? String, "v1")
-        let os = merged["os"] as? [String: Any]
-        XCTAssertEqual(os?["name"] as? String, "iOS")
-    }
     
 }

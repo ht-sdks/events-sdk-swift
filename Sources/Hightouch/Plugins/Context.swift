@@ -38,11 +38,9 @@ public class Context: PlatformPlugin {
         }
         
         // if this event came in with context data already
-        // let it take precedence over our values. Nested maps are
-        // merged so per-call keys like protocols.schemaVersion
-        // do not wipe platform context (library, device, etc).
+        // let it take precedence over our values.
         if let eventContext = workingEvent.context?.dictionaryValue {
-            context = context.deepMerged(eventContext)
+            context.merge(eventContext) { (_, new) in new }
         }
         
         do {
