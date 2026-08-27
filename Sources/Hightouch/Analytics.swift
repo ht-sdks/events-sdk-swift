@@ -75,9 +75,9 @@ public class Analytics {
         platformStartup()
     }
     
-    internal func process<E: RawEvent>(incomingEvent: E) {
+    internal func process<E: RawEvent>(incomingEvent: E, enrichments: [EnrichmentClosure]? = nil) {
         guard enabled == true else { return }
-        let event = incomingEvent.applyRawEventData(store: store)
+        let event = incomingEvent.applyRawEventData(store: store, enrichments: enrichments)
         
         _ = timeline.process(incomingEvent: event)
         
