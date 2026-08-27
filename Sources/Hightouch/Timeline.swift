@@ -26,12 +26,14 @@ public class Timeline {
     
     @discardableResult
     internal func process<E: RawEvent>(incomingEvent: E) -> E? {
+        // Deliberate divergence from Segment upstream: capture the per-call enrichments up front so they survive plugins that return a fresh event (upstream drops them).
+        let enrichments = incomingEvent.enrichments
         // apply .before and .enrichment types first ...
         let beforeResult = applyPlugins(type: .before, event: incomingEvent)
         // .enrichment here is akin to source middleware in the old analytics-ios.
         var enrichmentResult = applyPlugins(type: .enrichment, event: beforeResult)
         
-        if let enrichments = enrichmentResult?.enrichments {
+        if let enrichments = enrichments {
             for closure in enrichments {
                 if let result = closure(enrichmentResult) as? E {
                     enrichmentResult = result

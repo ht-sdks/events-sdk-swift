@@ -179,6 +179,31 @@ final class Enrichments_Tests: XCTestCase {
         XCTAssertEqual(plainKeys, enrichedKeys)
     }
 
+    // Returns a fresh event via the copy-initializer, which does not carry
+    // `enrichments` over — mimicking plugins that rebuild the event.
+    class ReplacingPlugin: EventPlugin {
+        let type: PluginType = .enrichment
+        var analytics: Analytics?
+
+        func track(event: TrackEvent) -> TrackEvent? {
+            return TrackEvent(existing: event)
+        }
+    }
+
+    func testEnrichmentsSurviveEventReplacingPlugin() {
+        let (analytics, capture) = makeAnalytics(writeKey: "enrichReplaceTest")
+        analytics.add(plugin: ReplacingPlugin())
+
+        analytics.track(name: "replaced event", enrichments: [schemaVersionEnrichment("v3")])
+
+        let event = capture.events.last as? TrackEvent
+        XCTAssertNotNil(event)
+        // sanity: the replacing plugin really did drop the closures from the event...
+        XCTAssertNil(event?.enrichments)
+        // ...but the captured per-call enrichments still ran and stamped it.
+        XCTAssertEqual(schemaVersion(of: event), "v3")
+    }
+
     func testEnrichmentChangingEventTypeIsIgnored() {
         let (analytics, capture) = makeAnalytics(writeKey: "enrichTypeChangeTest")
 
