@@ -204,6 +204,35 @@ final class Enrichments_Tests: XCTestCase {
         XCTAssertEqual(schemaVersion(of: event), "v3")
     }
 
+    // Drops track events entirely, like a consent/filtering plugin would.
+    class DroppingPlugin: EventPlugin {
+        let type: PluginType = .enrichment
+        var analytics: Analytics?
+
+        func track(event: TrackEvent) -> TrackEvent? {
+            return nil
+        }
+    }
+
+    func testEnrichmentsDoNotRunWhenPluginDropsEvent() {
+        let (analytics, capture) = makeAnalytics(writeKey: "enrichDropTest")
+        analytics.add(plugin: DroppingPlugin())
+
+        var closureRan = false
+        let recorder: EnrichmentClosure = { event in
+            closureRan = true
+            return event
+        }
+
+        analytics.track(name: "dropped event", enrichments: [recorder])
+
+        XCTAssertFalse(closureRan, "Per-call enrichments must not run for events dropped by plugins.")
+        XCTAssertFalse(
+            capture.events.contains { ($0 as? TrackEvent)?.event == "dropped event" },
+            "Dropped events must stay dropped."
+        )
+    }
+
     func testEnrichmentChangingEventTypeIsIgnored() {
         let (analytics, capture) = makeAnalytics(writeKey: "enrichTypeChangeTest")
 

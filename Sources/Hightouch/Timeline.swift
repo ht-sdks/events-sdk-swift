@@ -33,7 +33,8 @@ public class Timeline {
         // .enrichment here is akin to source middleware in the old analytics-ios.
         var enrichmentResult = applyPlugins(type: .enrichment, event: beforeResult)
         
-        if let enrichments = enrichments {
+        // Skip per-call enrichments if a plugin dropped the event; dropped events stay dropped.
+        if let enrichments = enrichments, enrichmentResult != nil {
             for closure in enrichments {
                 if let result = closure(enrichmentResult) as? E {
                     enrichmentResult = result

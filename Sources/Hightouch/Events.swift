@@ -223,7 +223,7 @@ extension Analytics {
 // MARK: - Enrichment event signatures
 
 extension Analytics {
-    // Tracks an event performed by a user, including some additional event properties.
+    /// Tracks an event performed by a user, including some additional event properties.
     /// - Parameters:
     ///   - name: Name of the action, e.g., 'Purchased a T-Shirt'
     ///   - properties: Properties specific to the named event. For example, an event with
