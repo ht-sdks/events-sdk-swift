@@ -14,10 +14,10 @@ jobs:
   build_and_test_spm_mac:
     runs-on: macos-14
     steps:
-      - uses: maxim-lobanov/setup-xcode@v1
+      - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
           xcode-version: "15.4"
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Build
         run: swift build
       - name: Run tests
@@ -26,10 +26,10 @@ jobs:
   build_and_test_spm_linux:
     runs-on: ubuntu-latest
     steps:
-      - uses: sersoft-gmbh/swifty-linux-action@v3
+      - uses: sersoft-gmbh/swifty-linux-action@577251f82ce4f38e1ae770530f0b64305502a5fa # v3.0.1
         with:
           release-version: "5.10.1"
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Build
         run: swift build
       - name: Run tests
@@ -38,37 +38,37 @@ jobs:
   build_and_test_ios:
     runs-on: macos-14
     steps:
-      - uses: maxim-lobanov/setup-xcode@v1
+      - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
           xcode-version: "15.4"
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: xcodebuild -scheme Hightouch-Package test -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 15'
 
   build_and_test_tvos:
     runs-on: macos-14
     steps:
-      - uses: maxim-lobanov/setup-xcode@v1
+      - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
           xcode-version: "15.4"
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: xcodebuild -scheme Hightouch-Package test -sdk appletvsimulator -destination 'platform=tvOS Simulator,name=Apple TV'
 
   build_and_test_watchos:
     runs-on: macos-14
     steps:
-      - uses: maxim-lobanov/setup-xcode@v1
+      - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
           xcode-version: "15.4"
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: xcodebuild -scheme Hightouch-Package test -sdk watchsimulator -destination 'platform=watchOS Simulator,name=Apple Watch Series 9 (45mm)'
 
   build_and_test_examples:
     runs-on: macos-14
     steps:
-      - uses: maxim-lobanov/setup-xcode@v1
+      - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
           xcode-version: "15.4"
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: build for ios simulator
         run: |
           cd Examples/apps/BasicExample
