@@ -23,6 +23,23 @@ jobs:
       - name: Run tests
         run: swift test
 
+  build_and_test_destinations:
+    runs-on: macos-14
+    steps:
+      - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
+        with:
+          xcode-version: "15.4"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Run tests
+        run: |
+          failed=""
+          for package in Destinations/*/; do
+            echo "::group::$package"
+            (cd "$package" && swift test) || failed="$failed $package"
+            echo "::endgroup::"
+          done
+          if [ -n "$failed" ]; then echo "Failed:$failed"; exit 1; fi
+
   build_and_test_spm_linux:
     runs-on: ubuntu-latest
     steps:
