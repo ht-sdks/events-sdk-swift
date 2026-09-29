@@ -292,6 +292,18 @@ final class BrazeDestination_Tests: XCTestCase {
         XCTAssertEqual(client.calls, [.purchase("Order Completed", "USD", 0, 1, ["products": [["sku": "SKU1"]]])])
     }
 
+    func testTransformPurchaseCanSetMissingProductId() {
+        let destination = makeDestination(.init(transformPurchase: { purchase, context in
+            var purchase = purchase
+            if purchase.productId.isEmpty {
+                purchase.productId = context.product?["id"] as? String ?? ""
+            }
+            return purchase
+        }))
+        track(destination, "Order Completed", ["products": [["id": "custom-1", "price": 3]]])
+        XCTAssertEqual(client.calls, [.purchase("custom-1", "USD", 3, 1, ["id": "custom-1"])])
+    }
+
     func testTransformPurchaseWithEmptyProductIdIsSkipped() {
         let destination = makeDestination(.init(transformPurchase: { purchase, _ in
             var purchase = purchase

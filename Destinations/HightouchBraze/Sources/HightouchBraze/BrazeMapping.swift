@@ -187,10 +187,7 @@ extension BrazeDestination {
         var orderFields = properties
         orderFields["products"] = nil
         for product in products {
-            guard let productId = idKeys.lazy.compactMap({ product[$0].flatMap(Self.scalarString) }).first(where: { !$0.isEmpty }) else {
-                log("Dropped a product from \(event.event) with no \(idKeys.joined(separator: " or ")).")
-                continue
-            }
+            let productId = idKeys.lazy.compactMap({ product[$0].flatMap(Self.scalarString) }).first(where: { !$0.isEmpty }) ?? ""
             let fields = orderFields.merging(product.filter { $0.key != "price" && $0.key != "quantity" }) { $1 }
             let price = Self.decimal(product["price"]).map(Self.double) ?? 0
             let quantity = product["quantity"]?.intValue ?? 1
@@ -203,11 +200,11 @@ extension BrazeDestination {
         var purchase = purchase
         if let transformPurchase = options.transformPurchase {
             guard let transformed = transformPurchase(purchase, context) else { return }
-            guard !transformed.productId.isEmpty else {
-                log("Dropped a purchase from \(context.event.event); transformPurchase returned an empty productId.")
-                return
-            }
             purchase = transformed
+        }
+        guard !purchase.productId.isEmpty else {
+            log("Dropped a purchase from \(context.event.event) with an empty productId.")
+            return
         }
         client.logPurchase(productId: purchase.productId, currency: purchase.currency, price: purchase.price, quantity: purchase.quantity, properties: purchase.properties.nonEmpty)
     }
