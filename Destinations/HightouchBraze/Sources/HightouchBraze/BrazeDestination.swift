@@ -24,7 +24,7 @@ public final class BrazeDestination: DestinationPlugin {
             /// `track` events with one of these names. Case-sensitive.
             case eventNames([String])
             /// `track` events for which the closure returns `true`.
-            case custom((TrackEvent) -> Bool)
+            case matcher((TrackEvent) -> Bool)
         }
 
         public enum PurchaseGrouping {
@@ -37,7 +37,7 @@ public final class BrazeDestination: DestinationPlugin {
         /// Which `track` events are logged as purchases.
         public var purchaseDetection: PurchaseDetection
         /// How a purchase event is split into Braze purchases.
-        public var purchases: PurchaseGrouping
+        public var purchaseGrouping: PurchaseGrouping
         /// Forward `screen` calls as Braze custom events.
         public var forwardScreenViews: Bool
         /// Changes each purchase before it's logged. Return `nil` to skip the purchase.
@@ -46,12 +46,12 @@ public final class BrazeDestination: DestinationPlugin {
         public var stringifyAttributeValues: Bool
 
         public init(purchaseDetection: PurchaseDetection = .eventNames(["Order Completed", "Completed Order"]),
-                    purchases: PurchaseGrouping = .perProduct(identifier: .sku),
+                    purchaseGrouping: PurchaseGrouping = .perProduct(identifier: .sku),
                     forwardScreenViews: Bool = false,
                     transformPurchase: ((BrazePurchase, PurchaseContext) -> BrazePurchase?)? = nil,
                     stringifyAttributeValues: Bool = false) {
             self.purchaseDetection = purchaseDetection
-            self.purchases = purchases
+            self.purchaseGrouping = purchaseGrouping
             self.forwardScreenViews = forwardScreenViews
             self.transformPurchase = transformPurchase
             self.stringifyAttributeValues = stringifyAttributeValues

@@ -149,7 +149,7 @@ extension BrazeDestination {
         let isPurchase: Bool
         switch options.purchaseDetection {
         case .eventNames(let names): isPurchase = names.contains(name)
-        case .custom(let isPurchaseEvent): isPurchase = isPurchaseEvent(event)
+        case .matcher(let isPurchaseEvent): isPurchase = isPurchaseEvent(event)
         }
         if isPurchase {
             logPurchases(event, properties: properties, to: client)
@@ -181,7 +181,7 @@ extension BrazeDestination {
             }
         }
 
-        guard case .perProduct(let identifier) = options.purchases, !products.isEmpty else {
+        guard case .perProduct(let identifier) = options.purchaseGrouping, !products.isEmpty else {
             let total = (Self.decimal(properties["revenue"]) ?? Self.decimal(properties["total"])).map(Self.double) ?? 0
             let purchase = BrazePurchase(productId: event.event, price: total, currency: currency, quantity: 1, properties: eventProperties(properties))
             logPurchase(purchase, context: PurchaseContext(event: event, order: order, product: nil), to: client)

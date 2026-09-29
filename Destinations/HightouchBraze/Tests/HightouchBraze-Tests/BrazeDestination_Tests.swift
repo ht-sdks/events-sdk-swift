@@ -236,7 +236,7 @@ final class BrazeDestination_Tests: XCTestCase {
     }
 
     func testPurchaseProductIdentifierName() {
-        let destination = makeDestination(.init(purchases: .perProduct(identifier: .name)))
+        let destination = makeDestination(.init(purchaseGrouping: .perProduct(identifier: .name)))
         track(destination, "Completed Order", ["products": [["sku": "SKU1", "name": "Shirt", "price": 10], ["sku": "SKU2"]]])
         XCTAssertEqual(client.calls, [.purchase("Shirt", "USD", 10, 1, ["sku": "SKU1", "name": "Shirt"])])
     }
@@ -248,7 +248,7 @@ final class BrazeDestination_Tests: XCTestCase {
     }
 
     func testPerOrderPurchases() {
-        let destination = makeDestination(.init(purchases: .perOrder))
+        let destination = makeDestination(.init(purchaseGrouping: .perOrder))
         let products: [[String: Any]] = [["sku": "SKU1", "name": "Shirt", "price": 10, "quantity": 2, "coupon": "C1"]]
         track(destination, "Order Completed", ["order_id": "o1", "revenue": 25, "currency": "EUR", "products": products])
         XCTAssertEqual(client.calls, [
@@ -283,7 +283,7 @@ final class BrazeDestination_Tests: XCTestCase {
 
     func testTransformPurchaseInPerOrderMode() {
         var product: [String: Any]? = ["unset": true]
-        let destination = makeDestination(.init(purchases: .perOrder, transformPurchase: { purchase, context in
+        let destination = makeDestination(.init(purchaseGrouping: .perOrder, transformPurchase: { purchase, context in
             product = context.product
             return purchase
         }))
@@ -337,7 +337,7 @@ final class BrazeDestination_Tests: XCTestCase {
     }
 
     func testCustomPurchaseDetection() {
-        let destination = makeDestination(.init(purchaseDetection: .custom { $0.event == "Membership Purchased" }))
+        let destination = makeDestination(.init(purchaseDetection: .matcher { $0.event == "Membership Purchased" }))
         track(destination, "Membership Purchased")
         track(destination, "Order Completed")
         XCTAssertEqual(client.calls, [
