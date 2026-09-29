@@ -270,6 +270,40 @@ final class BrazeDestination_Tests: XCTestCase {
         ])
     }
 
+    func testDefaultPurchaseEventNames() {
+        let destination = makeDestination()
+        track(destination, "Order Completed")
+        track(destination, "Completed Order")
+        track(destination, "order completed")
+        XCTAssertEqual(client.calls, [
+            .purchase("Order Completed", "USD", 0, 1, nil),
+            .purchase("Completed Order", "USD", 0, 1, nil),
+            .customEvent("order completed", nil),
+        ])
+    }
+
+    func testCustomPurchaseEventNames() {
+        let destination = makeDestination(.init(purchaseEventNames: ["Membership Purchased"]))
+        track(destination, "Membership Purchased", ["revenue": 20])
+        track(destination, "Order Completed")
+        XCTAssertEqual(client.calls, [
+            .purchase("Membership Purchased", "USD", 20, 1, ["revenue": 20]),
+            .customEvent("Order Completed", nil),
+        ])
+    }
+
+    func testIsPurchaseEventOverridesNamesAndRevenue() {
+        let destination = makeDestination(.init(isPurchaseEvent: { $0.event == "Membership Purchased" }, logPurchaseWhenRevenuePresent: true))
+        track(destination, "Membership Purchased")
+        track(destination, "Order Completed")
+        track(destination, "Upgraded", ["revenue": 9.99])
+        XCTAssertEqual(client.calls, [
+            .purchase("Membership Purchased", "USD", 0, 1, nil),
+            .customEvent("Order Completed", nil),
+            .customEvent("Upgraded", ["revenue": 9.99]),
+        ])
+    }
+
     func testInstallAttributedSetsAttributionData() {
         let destination = makeDestination()
         track(destination, "Install Attributed", ["campaign": ["source": "Google", "name": "Fall", "ad_group": "G1"]])

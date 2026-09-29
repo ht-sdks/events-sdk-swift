@@ -21,10 +21,14 @@ public final class BrazeDestination: DestinationPlugin {
         }
 
         public var purchaseProductIdentifier: PurchaseProductIdentifier
-        /// Log one `eCommerce - purchase` per `Order Completed` instead of one purchase per product.
+        /// Log one `eCommerce - purchase` per purchase event instead of one purchase per product.
         public var bundleCommerceEvents: Bool
         /// Forward `screen` calls as Braze custom events.
         public var forwardScreenViews: Bool
+        /// `track` event names logged as purchases. Case-sensitive.
+        public var purchaseEventNames: [String]
+        /// Decides whether a `track` event is a purchase. When set, `purchaseEventNames` and `logPurchaseWhenRevenuePresent` are ignored.
+        public var isPurchaseEvent: ((TrackEvent) -> Bool)?
         /// Treat any `track` call with a non-zero `revenue` property as a purchase.
         public var logPurchaseWhenRevenuePresent: Bool
         /// Send user attribute and event property values as strings.
@@ -33,11 +37,15 @@ public final class BrazeDestination: DestinationPlugin {
         public init(purchaseProductIdentifier: PurchaseProductIdentifier = .sku,
                     bundleCommerceEvents: Bool = false,
                     forwardScreenViews: Bool = false,
+                    purchaseEventNames: [String] = ["Order Completed", "Completed Order"],
+                    isPurchaseEvent: ((TrackEvent) -> Bool)? = nil,
                     logPurchaseWhenRevenuePresent: Bool = false,
                     stringifyAttributeValues: Bool = false) {
             self.purchaseProductIdentifier = purchaseProductIdentifier
             self.bundleCommerceEvents = bundleCommerceEvents
             self.forwardScreenViews = forwardScreenViews
+            self.purchaseEventNames = purchaseEventNames
+            self.isPurchaseEvent = isPurchaseEvent
             self.logPurchaseWhenRevenuePresent = logPurchaseWhenRevenuePresent
             self.stringifyAttributeValues = stringifyAttributeValues
         }

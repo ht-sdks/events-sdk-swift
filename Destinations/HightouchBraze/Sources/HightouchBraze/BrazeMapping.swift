@@ -17,7 +17,6 @@ extension BrazeDestination {
         "address", "home_city", "$City", "country", "$Country", "$Zip",
         "email_subscribe", "push_subscribe",
     ]
-    static let purchaseEventNames: Set<String> = ["Order Completed", "Completed Order"]
     static let bundledPurchaseName = "eCommerce - purchase"
     static let productFieldNames = [
         "name": "Name", "brand": "Brand", "category": "Category",
@@ -158,12 +157,19 @@ extension BrazeDestination {
             client.setAttributionData(network: field("source"), campaign: field("name"), adGroup: field("ad_group"), creative: field("ad_creative"))
         }
 
-        let revenue = Self.decimal(properties["revenue"])
-        if Self.purchaseEventNames.contains(name) || (options.logPurchaseWhenRevenuePresent && revenue != nil && revenue != 0) {
+        if isPurchase(event, name: name, properties: properties) {
             logPurchases(name: name, properties: properties, to: client)
         } else {
             client.logCustomEvent(name: name, properties: eventProperties(properties).nonEmpty)
         }
+    }
+
+    private func isPurchase(_ event: TrackEvent, name: String, properties: [String: JSON]) -> Bool {
+        if let isPurchaseEvent = options.isPurchaseEvent {
+            return isPurchaseEvent(event)
+        }
+        let revenue = Self.decimal(properties["revenue"])
+        return options.purchaseEventNames.contains(name) || (options.logPurchaseWhenRevenuePresent && revenue != nil && revenue != 0)
     }
 
     func forwardScreen(_ event: ScreenEvent, to client: BrazeClient) {
