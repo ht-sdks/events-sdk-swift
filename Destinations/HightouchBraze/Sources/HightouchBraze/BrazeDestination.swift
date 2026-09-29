@@ -20,32 +20,39 @@ public final class BrazeDestination: DestinationPlugin {
             case name
         }
 
-        public var purchaseProductIdentifier: PurchaseProductIdentifier
-        /// Log one purchase per purchase event, with the event name as its product ID, instead of one purchase per product.
-        public var bundleCommerceEvents: Bool
+        public enum PurchaseDetection {
+            /// `track` events with one of these names. Case-sensitive.
+            case eventNames([String])
+            /// `track` events for which the closure returns `true`.
+            case custom((TrackEvent) -> Bool)
+        }
+
+        public enum PurchaseGrouping {
+            /// One purchase per product. An event without products is logged as one purchase with the event name as its product ID.
+            case perProduct(identifier: PurchaseProductIdentifier)
+            /// One purchase per purchase event, with the event name as its product ID.
+            case perOrder
+        }
+
+        /// Which `track` events are logged as purchases.
+        public var purchaseDetection: PurchaseDetection
+        /// How a purchase event is split into Braze purchases.
+        public var purchases: PurchaseGrouping
         /// Forward `screen` calls as Braze custom events.
         public var forwardScreenViews: Bool
-        /// `track` event names logged as purchases. Case-sensitive.
-        public var purchaseEventNames: [String]
-        /// Decides whether a `track` event is a purchase. When set, `purchaseEventNames` is ignored.
-        public var isPurchaseEvent: ((TrackEvent) -> Bool)?
         /// Changes each purchase before it's logged. Return `nil` to skip the purchase.
         public var transformPurchase: ((BrazePurchase, PurchaseContext) -> BrazePurchase?)?
         /// Send user attribute and event property values as strings.
         public var stringifyAttributeValues: Bool
 
-        public init(purchaseProductIdentifier: PurchaseProductIdentifier = .sku,
-                    bundleCommerceEvents: Bool = false,
+        public init(purchaseDetection: PurchaseDetection = .eventNames(["Order Completed", "Completed Order"]),
+                    purchases: PurchaseGrouping = .perProduct(identifier: .sku),
                     forwardScreenViews: Bool = false,
-                    purchaseEventNames: [String] = ["Order Completed", "Completed Order"],
-                    isPurchaseEvent: ((TrackEvent) -> Bool)? = nil,
                     transformPurchase: ((BrazePurchase, PurchaseContext) -> BrazePurchase?)? = nil,
                     stringifyAttributeValues: Bool = false) {
-            self.purchaseProductIdentifier = purchaseProductIdentifier
-            self.bundleCommerceEvents = bundleCommerceEvents
+            self.purchaseDetection = purchaseDetection
+            self.purchases = purchases
             self.forwardScreenViews = forwardScreenViews
-            self.purchaseEventNames = purchaseEventNames
-            self.isPurchaseEvent = isPurchaseEvent
             self.transformPurchase = transformPurchase
             self.stringifyAttributeValues = stringifyAttributeValues
         }

@@ -146,7 +146,12 @@ extension BrazeDestination {
             client.setAttributionData(network: field("source"), campaign: field("name"), adGroup: field("ad_group"), creative: field("ad_creative"))
         }
 
-        if options.isPurchaseEvent?(event) ?? options.purchaseEventNames.contains(name) {
+        let isPurchase: Bool
+        switch options.purchaseDetection {
+        case .eventNames(let names): isPurchase = names.contains(name)
+        case .custom(let isPurchaseEvent): isPurchase = isPurchaseEvent(event)
+        }
+        if isPurchase {
             logPurchases(event, properties: properties, to: client)
         } else {
             client.logCustomEvent(name: name, properties: eventProperties(properties).nonEmpty)
@@ -176,14 +181,14 @@ extension BrazeDestination {
             }
         }
 
-        if options.bundleCommerceEvents || products.isEmpty {
+        guard case .perProduct(let identifier) = options.purchases, !products.isEmpty else {
             let total = (Self.decimal(properties["revenue"]) ?? Self.decimal(properties["total"])).map(Self.double) ?? 0
             let purchase = BrazePurchase(productId: event.event, price: total, currency: currency, quantity: 1, properties: eventProperties(properties))
             logPurchase(purchase, context: PurchaseContext(event: event, order: order, product: nil), to: client)
             return
         }
 
-        let idKeys = options.purchaseProductIdentifier == .name ? ["name"] : ["sku", "product_id", "name"]
+        let idKeys = identifier == .name ? ["name"] : ["sku", "product_id", "name"]
         var orderFields = properties
         orderFields["products"] = nil
         for product in products {

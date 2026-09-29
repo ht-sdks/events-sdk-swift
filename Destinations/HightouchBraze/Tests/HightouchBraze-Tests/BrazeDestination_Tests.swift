@@ -236,7 +236,7 @@ final class BrazeDestination_Tests: XCTestCase {
     }
 
     func testPurchaseProductIdentifierName() {
-        let destination = makeDestination(.init(purchaseProductIdentifier: .name))
+        let destination = makeDestination(.init(purchases: .perProduct(identifier: .name)))
         track(destination, "Completed Order", ["products": [["sku": "SKU1", "name": "Shirt", "price": 10], ["sku": "SKU2"]]])
         XCTAssertEqual(client.calls, [.purchase("Shirt", "USD", 10, 1, ["sku": "SKU1", "name": "Shirt"])])
     }
@@ -247,8 +247,8 @@ final class BrazeDestination_Tests: XCTestCase {
         XCTAssertEqual(client.calls, [.purchase("Order Completed", "USD", 12, 1, ["total": 12, "currency": "dollars", "products": [Any]()])])
     }
 
-    func testBundleCommerceEvents() {
-        let destination = makeDestination(.init(bundleCommerceEvents: true))
+    func testPerOrderPurchases() {
+        let destination = makeDestination(.init(purchases: .perOrder))
         let products: [[String: Any]] = [["sku": "SKU1", "name": "Shirt", "price": 10, "quantity": 2, "coupon": "C1"]]
         track(destination, "Order Completed", ["order_id": "o1", "revenue": 25, "currency": "EUR", "products": products])
         XCTAssertEqual(client.calls, [
@@ -281,9 +281,9 @@ final class BrazeDestination_Tests: XCTestCase {
         XCTAssertNil(contexts[2].product)
     }
 
-    func testTransformPurchaseInBundledMode() {
+    func testTransformPurchaseInPerOrderMode() {
         var product: [String: Any]? = ["unset": true]
-        let destination = makeDestination(.init(bundleCommerceEvents: true, transformPurchase: { purchase, context in
+        let destination = makeDestination(.init(purchases: .perOrder, transformPurchase: { purchase, context in
             product = context.product
             return purchase
         }))
@@ -327,7 +327,7 @@ final class BrazeDestination_Tests: XCTestCase {
     }
 
     func testCustomPurchaseEventNames() {
-        let destination = makeDestination(.init(purchaseEventNames: ["Membership Purchased"]))
+        let destination = makeDestination(.init(purchaseDetection: .eventNames(["Membership Purchased"])))
         track(destination, "Membership Purchased", ["revenue": 20])
         track(destination, "Order Completed")
         XCTAssertEqual(client.calls, [
@@ -336,8 +336,8 @@ final class BrazeDestination_Tests: XCTestCase {
         ])
     }
 
-    func testIsPurchaseEventOverridesNames() {
-        let destination = makeDestination(.init(isPurchaseEvent: { $0.event == "Membership Purchased" }))
+    func testCustomPurchaseDetection() {
+        let destination = makeDestination(.init(purchaseDetection: .custom { $0.event == "Membership Purchased" }))
         track(destination, "Membership Purchased")
         track(destination, "Order Completed")
         XCTAssertEqual(client.calls, [
