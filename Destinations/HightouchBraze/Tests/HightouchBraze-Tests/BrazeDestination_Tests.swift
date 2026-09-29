@@ -82,13 +82,13 @@ final class BrazeDestination_Tests: XCTestCase {
         XCTAssertEqual(client.calls, [.update(.email("a@example.com"))])
     }
 
-    func testReservedTraitsAndMParticleAliases() {
+    func testReservedTraits() {
         let destination = makeDestination()
         identify(destination, [
             "first_name": "Jane",
-            "$LastName": "Doe",
-            "Email": "jane@example.com",
-            "$Mobile": "555-0100",
+            "lastName": "Doe",
+            "email": "jane@example.com",
+            "phone": "555-0100",
             "gender": "Female",
             "birthday": "1990-05-12T08:00:00Z",
             "address": ["city": "Austin", "country": "US", "postalCode": "78701", "street": "1 Main"],
@@ -104,27 +104,28 @@ final class BrazeDestination_Tests: XCTestCase {
             .update(.dateOfBirth(date(1990, 5, 12))),
             .update(.homeCity("Austin")),
             .update(.country("US")),
-            .update(.customAttribute("Zip", .string("78701"))),
+            .update(.customAttribute("postalCode", .string("78701"))),
+            .update(.customAttribute("street", .string("1 Main"))),
             .update(.emailSubscription(.optedIn)),
             .update(.pushSubscription(.unsubscribed)),
         ])
     }
 
-    func testTopLevelLocationAliases() {
+    func testBrazeLocationNames() {
         let destination = makeDestination()
-        identify(destination, ["home_city": "Austin", "$Country": "US", "$Zip": "78701"])
-        XCTAssertEqual(client.calls, [
-            .update(.homeCity("Austin")),
-            .update(.country("US")),
-            .update(.customAttribute("Zip", .string("78701"))),
-        ])
+        identify(destination, ["home_city": "Austin", "country": "US"])
+        XCTAssertEqual(client.calls, [.update(.homeCity("Austin")), .update(.country("US"))])
     }
 
-    func testAgeEstimatesDateOfBirth() {
+    func testMParticleNamesAndAgeAreCustomAttributes() {
         let destination = makeDestination()
-        identify(destination, ["$Age": 30])
-        let year = Calendar.current.component(.year, from: Date()) - 30
-        XCTAssertEqual(client.calls, [.update(.dateOfBirth(date(year, 1, 1)))])
+        identify(destination, ["$FirstName": "Jane", "Email": "jane@example.com", "$Zip": "78701", "age": 30])
+        XCTAssertEqual(client.calls, [
+            .update(.customAttribute("$FirstName", .string("Jane"))),
+            .update(.customAttribute("$Zip", .string("78701"))),
+            .update(.customAttribute("Email", .string("jane@example.com"))),
+            .update(.customAttribute("age", .int(30))),
+        ])
     }
 
     func testInvalidReservedValuesAreDropped() {
@@ -145,7 +146,7 @@ final class BrazeDestination_Tests: XCTestCase {
             "removed": NSNull(),
         ])
         XCTAssertEqual(client.calls, [
-            .update(.customAttribute("plan", .string("pro"))),
+            .update(.customAttribute("$plan", .string("pro"))),
             .update(.customAttribute("active", .bool(true))),
             .update(.customAttribute("count", .int(3))),
             .update(.customAttribute("prefs", .string(#"{"a":"x","b":1}"#))),
@@ -200,12 +201,12 @@ final class BrazeDestination_Tests: XCTestCase {
 
     // MARK: - Track
 
-    func testTrackLogsCustomEventWithDollarsStripped() {
+    func testTrackPassesNamesThrough() {
         let destination = makeDestination()
         track(destination, "$Signed Up", ["$plan": "pro", "nested": ["items": [1, 2.5]], "none": NSNull()])
         track(destination, "No Properties")
         XCTAssertEqual(client.calls, [
-            .customEvent("Signed Up", ["plan": "pro", "nested": ["items": [1, 2.5]]]),
+            .customEvent("$Signed Up", ["$plan": "pro", "nested": ["items": [1, 2.5]]]),
             .customEvent("No Properties", nil),
         ])
     }
@@ -216,58 +217,89 @@ final class BrazeDestination_Tests: XCTestCase {
             "order_id": "o1",
             "revenue": 25.5,
             "currency": "EUR",
+            "coupon": "ORDER",
             "products": [
-                ["sku": "SKU1", "product_id": "p1", "name": "Shirt", "price": 10, "quantity": 2,
-                 "brand": "B", "category": "Tops", "variant": "Red", "position": 1, "coupon": "C1", "$color": "red"],
+                ["sku": "SKU1", "product_id": "p1", "name": "Shirt", "price": 10, "quantity": 2, "coupon": "C1", "$color": "red"],
                 ["product_id": "p2", "name": "Hat", "price": "5.5"],
+                ["name": "Scarf"],
+                ["price": 1],
             ],
         ])
         XCTAssertEqual(client.calls, [
             .purchase("SKU1", "EUR", 10, 2, [
-                "order_id": "o1", "revenue": 25.5, "Transaction Id": "o1",
-                "product_id": "p1", "Name": "Shirt", "Brand": "B", "Category": "Tops", "Variant": "Red",
-                "Position": 1, "Coupon Code": "C1", "color": "red",
+                "order_id": "o1", "revenue": 25.5, "currency": "EUR",
+                "sku": "SKU1", "product_id": "p1", "name": "Shirt", "coupon": "C1", "$color": "red",
             ]),
-            .purchase("p2", "EUR", 5.5, 1, ["order_id": "o1", "revenue": 25.5, "Transaction Id": "o1", "Name": "Hat"]),
+            .purchase("p2", "EUR", 5.5, 1, ["order_id": "o1", "revenue": 25.5, "currency": "EUR", "coupon": "ORDER", "product_id": "p2", "name": "Hat"]),
+            .purchase("Scarf", "EUR", 0, 1, ["order_id": "o1", "revenue": 25.5, "currency": "EUR", "coupon": "ORDER", "name": "Scarf"]),
         ])
     }
 
     func testPurchaseProductIdentifierName() {
         let destination = makeDestination(.init(purchaseProductIdentifier: .name))
         track(destination, "Completed Order", ["products": [["sku": "SKU1", "name": "Shirt", "price": 10], ["sku": "SKU2"]]])
-        XCTAssertEqual(client.calls, [.purchase("Shirt", "USD", 10, 1, ["Name": "Shirt"])])
+        XCTAssertEqual(client.calls, [.purchase("Shirt", "USD", 10, 1, ["sku": "SKU1", "name": "Shirt"])])
     }
 
     func testOrderCompletedWithoutProducts() {
         let destination = makeDestination()
-        track(destination, "Order Completed", ["total": 12, "currency": "dollars"])
-        XCTAssertEqual(client.calls, [.purchase("Order Completed", "USD", 12, 1, ["total": 12])])
+        track(destination, "Order Completed", ["total": 12, "currency": "dollars", "products": []])
+        XCTAssertEqual(client.calls, [.purchase("Order Completed", "USD", 12, 1, ["total": 12, "currency": "dollars", "products": [Any]()])])
     }
 
     func testBundleCommerceEvents() {
         let destination = makeDestination(.init(bundleCommerceEvents: true))
-        track(destination, "Order Completed", [
-            "order_id": "o1",
-            "revenue": 25,
-            "products": [["sku": "SKU1", "name": "Shirt", "price": 10, "quantity": 2, "coupon": "C1"]],
-        ])
+        let products: [[String: Any]] = [["sku": "SKU1", "name": "Shirt", "price": 10, "quantity": 2, "coupon": "C1"]]
+        track(destination, "Order Completed", ["order_id": "o1", "revenue": 25, "currency": "EUR", "products": products])
         XCTAssertEqual(client.calls, [
-            .purchase("eCommerce - purchase", "USD", 25, 1, [
-                "order_id": "o1", "revenue": 25, "Transaction Id": "o1",
-                "products": [["Id": "SKU1", "Name": "Shirt", "Price": 10, "Quantity": 2, "Coupon Code": "C1", "Total Product Amount": 20]],
-            ]),
+            .purchase("Order Completed", "EUR", 25, 1, ["order_id": "o1", "revenue": 25, "currency": "EUR", "products": products]),
         ])
     }
 
-    func testLogPurchaseWhenRevenuePresent() {
-        track(makeDestination(), "Upgraded", ["revenue": 9.99])
-        track(makeDestination(.init(logPurchaseWhenRevenuePresent: true)), "Upgraded", ["revenue": 9.99])
-        track(makeDestination(.init(logPurchaseWhenRevenuePresent: true)), "Upgraded", ["revenue": 0])
+    func testTransformPurchase() {
+        var contexts = [PurchaseContext]()
+        let destination = makeDestination(.init(transformPurchase: { purchase, context in
+            contexts.append(context)
+            guard context.product?["sku"] as? String != "SKIP" else { return nil }
+            var purchase = purchase
+            purchase.productId = "x-\(purchase.productId)"
+            purchase.price *= 2
+            purchase.currency = "EUR"
+            purchase.quantity = 3
+            purchase.properties = ["Transaction Id": context.order["order_id"] ?? ""]
+            return purchase
+        }))
+        track(destination, "Order Completed", ["order_id": "o1", "products": [["sku": "SKU1", "price": 5], ["sku": "SKIP"]]])
+        track(destination, "Order Completed", ["order_id": "o2", "revenue": 4])
         XCTAssertEqual(client.calls, [
-            .customEvent("Upgraded", ["revenue": 9.99]),
-            .purchase("Upgraded", "USD", 9.99, 1, ["revenue": 9.99]),
-            .customEvent("Upgraded", ["revenue": 0]),
+            .purchase("x-SKU1", "EUR", 10, 3, ["Transaction Id": "o1"]),
+            .purchase("x-Order Completed", "EUR", 8, 3, ["Transaction Id": "o2"]),
         ])
+        XCTAssertEqual(contexts.map { $0.event.event }, ["Order Completed", "Order Completed", "Order Completed"])
+        XCTAssertEqual(contexts[0].product as NSDictionary?, ["sku": "SKU1", "price": 5])
+        XCTAssertEqual(contexts[0].order["order_id"] as? String, "o1")
+        XCTAssertNil(contexts[2].product)
+    }
+
+    func testTransformPurchaseInBundledMode() {
+        var product: [String: Any]? = ["unset": true]
+        let destination = makeDestination(.init(bundleCommerceEvents: true, transformPurchase: { purchase, context in
+            product = context.product
+            return purchase
+        }))
+        track(destination, "Order Completed", ["products": [["sku": "SKU1"]]])
+        XCTAssertNil(product)
+        XCTAssertEqual(client.calls, [.purchase("Order Completed", "USD", 0, 1, ["products": [["sku": "SKU1"]]])])
+    }
+
+    func testTransformPurchaseWithEmptyProductIdIsSkipped() {
+        let destination = makeDestination(.init(transformPurchase: { purchase, _ in
+            var purchase = purchase
+            purchase.productId = ""
+            return purchase
+        }))
+        track(destination, "Order Completed", ["products": [["sku": "SKU1"]]])
+        XCTAssertEqual(client.calls, [])
     }
 
     func testDefaultPurchaseEventNames() {
@@ -292,15 +324,13 @@ final class BrazeDestination_Tests: XCTestCase {
         ])
     }
 
-    func testIsPurchaseEventOverridesNamesAndRevenue() {
-        let destination = makeDestination(.init(isPurchaseEvent: { $0.event == "Membership Purchased" }, logPurchaseWhenRevenuePresent: true))
+    func testIsPurchaseEventOverridesNames() {
+        let destination = makeDestination(.init(isPurchaseEvent: { $0.event == "Membership Purchased" }))
         track(destination, "Membership Purchased")
         track(destination, "Order Completed")
-        track(destination, "Upgraded", ["revenue": 9.99])
         XCTAssertEqual(client.calls, [
             .purchase("Membership Purchased", "USD", 0, 1, nil),
             .customEvent("Order Completed", nil),
-            .customEvent("Upgraded", ["revenue": 9.99]),
         ])
     }
 

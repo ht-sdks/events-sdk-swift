@@ -8,21 +8,15 @@ import Hightouch
 
 extension BrazeDestination {
     static let reservedTraitKeys: Set<String> = [
-        "firstName", "first_name", "$FirstName",
-        "lastName", "last_name", "$LastName",
-        "email", "Email",
-        "phone", "$Mobile",
-        "gender", "$Gender",
-        "birthday", "dob", "age", "$Age",
-        "address", "home_city", "$City", "country", "$Country", "$Zip",
+        "firstName", "first_name",
+        "lastName", "last_name",
+        "email",
+        "phone",
+        "gender",
+        "birthday", "dob",
+        "address", "home_city", "country",
         "email_subscribe", "push_subscribe",
     ]
-    static let bundledPurchaseName = "eCommerce - purchase"
-    static let productFieldNames = [
-        "name": "Name", "brand": "Brand", "category": "Category",
-        "variant": "Variant", "position": "Position", "coupon": "Coupon Code",
-    ]
-    static let bundledProductFieldNames = productFieldNames.merging(["sku": "Id", "price": "Price", "quantity": "Quantity"]) { $1 }
 
     // MARK: - Identify
 
@@ -42,11 +36,11 @@ extension BrazeDestination {
                 updates.append(makeUpdate(value))
             }
         }
-        add(string("firstName", "first_name", "$FirstName"), BrazeUserUpdate.firstName)
-        add(string("lastName", "last_name", "$LastName"), BrazeUserUpdate.lastName)
-        add(string("email", "Email"), BrazeUserUpdate.email)
-        add(string("phone", "$Mobile"), BrazeUserUpdate.phoneNumber)
-        if let value = string("gender", "$Gender") {
+        add(string("firstName", "first_name"), BrazeUserUpdate.firstName)
+        add(string("lastName", "last_name"), BrazeUserUpdate.lastName)
+        add(string("email"), BrazeUserUpdate.email)
+        add(string("phone"), BrazeUserUpdate.phoneNumber)
+        if let value = string("gender") {
             if let gender = Self.gender(from: value) {
                 updates.append(.gender(gender))
             } else {
@@ -59,15 +53,12 @@ extension BrazeDestination {
             } else {
                 log("Dropped birthday \"\(value)\"; expected an ISO 8601 or yyyy-MM-dd date.")
             }
-        } else if let age = (traits["age"] ?? traits["$Age"])?.intValue {
-            let year = Calendar.current.component(.year, from: Date()) - age
-            if let date = DateComponents(calendar: .current, year: year, month: 1, day: 1).date {
-                updates.append(.dateOfBirth(date))
-            }
         }
-        add(address["city"].flatMap(Self.scalarString) ?? string("home_city", "$City"), BrazeUserUpdate.homeCity)
-        add(address["country"].flatMap(Self.scalarString) ?? string("country", "$Country"), BrazeUserUpdate.country)
-        add(address["postalCode"].flatMap(Self.scalarString) ?? string("$Zip")) { .customAttribute("Zip", .string($0)) }
+        add(address["city"].flatMap(Self.scalarString) ?? string("home_city"), BrazeUserUpdate.homeCity)
+        add(address["country"].flatMap(Self.scalarString) ?? string("country"), BrazeUserUpdate.country)
+        for (key, value) in address.sorted(by: { $0.key < $1.key }) where key != "city" && key != "country" {
+            updates.append(.customAttribute(key, attributeValue(value)))
+        }
         for (key, makeUpdate) in [("email_subscribe", BrazeUserUpdate.emailSubscription), ("push_subscribe", BrazeUserUpdate.pushSubscription)] {
             guard let value = string(key) else { continue }
             if let state = Self.subscriptionState(from: value) {
@@ -77,10 +68,8 @@ extension BrazeDestination {
             }
         }
 
-        for (key, value) in traits.sorted(by: { $0.key < $1.key }) where !Self.reservedTraitKeys.contains(key) {
-            let strippedKey = Self.stripDollars(key)
-            guard !strippedKey.isEmpty else { continue }
-            updates.append(.customAttribute(strippedKey, attributeValue(value)))
+        for (key, value) in traits.sorted(by: { $0.key < $1.key }) where !Self.reservedTraitKeys.contains(key) && !key.isEmpty {
+            updates.append(.customAttribute(key, attributeValue(value)))
         }
         return updates
     }
@@ -130,7 +119,7 @@ extension BrazeDestination {
         }
     }
 
-    // Only the date portion is used, in the local calendar like mParticle's kit, so a UTC timestamp can't shift the birthday by a day.
+    // Only the date portion is used, in the local calendar, so a UTC timestamp can't shift the birthday by a day.
     static func dateOfBirth(from value: String) -> Date? {
         guard value.count == 10 || value.dropFirst(10).first == "T" else { return nil }
         let parts = value.prefix(10).split(separator: "-", omittingEmptySubsequences: false).map { Int($0) }
@@ -142,7 +131,7 @@ extension BrazeDestination {
     // MARK: - Track and screen
 
     func forwardTrack(_ event: TrackEvent, to client: BrazeClient) {
-        let name = Self.stripDollars(event.event)
+        let name = event.event
         guard !name.isEmpty else {
             log("Dropped track call with an empty event name.")
             return
@@ -157,23 +146,15 @@ extension BrazeDestination {
             client.setAttributionData(network: field("source"), campaign: field("name"), adGroup: field("ad_group"), creative: field("ad_creative"))
         }
 
-        if isPurchase(event, properties: properties) {
-            logPurchases(name: name, properties: properties, to: client)
+        if options.isPurchaseEvent?(event) ?? options.purchaseEventNames.contains(name) {
+            logPurchases(event, properties: properties, to: client)
         } else {
             client.logCustomEvent(name: name, properties: eventProperties(properties).nonEmpty)
         }
     }
 
-    private func isPurchase(_ event: TrackEvent, properties: [String: JSON]) -> Bool {
-        if let isPurchaseEvent = options.isPurchaseEvent {
-            return isPurchaseEvent(event)
-        }
-        let revenue = Self.decimal(properties["revenue"])
-        return options.purchaseEventNames.contains(event.event) || (options.logPurchaseWhenRevenuePresent && revenue != nil && revenue != 0)
-    }
-
     func forwardScreen(_ event: ScreenEvent, to client: BrazeClient) {
-        guard let name = event.name.map(Self.stripDollars), !name.isEmpty else { return }
+        guard let name = event.name, !name.isEmpty else { return }
         var properties = [String: JSON]()
         if case .object(let value)? = event.properties {
             properties = value
@@ -181,18 +162,12 @@ extension BrazeDestination {
         client.logCustomEvent(name: name, properties: eventProperties(properties).nonEmpty)
     }
 
-    private func logPurchases(name: String, properties: [String: JSON], to client: BrazeClient) {
+    private func logPurchases(_ event: TrackEvent, properties: [String: JSON], to client: BrazeClient) {
         var currency = "USD"
         if case .string(let value)? = properties["currency"], value.count == 3 {
             currency = value
         }
-        let total = (Self.decimal(properties["revenue"]) ?? Self.decimal(properties["total"])).map(Self.double) ?? 0
-        var order = properties
-        order["products"] = nil
-        order["currency"] = nil
-        if let orderId = properties["order_id"] {
-            order["Transaction Id"] = orderId
-        }
+        let order = event.properties?.dictionaryValue ?? [:]
         var products = [[String: JSON]]()
         if case .array(let items)? = properties["products"] {
             products = items.compactMap { item in
@@ -201,66 +176,46 @@ extension BrazeDestination {
             }
         }
 
-        if options.bundleCommerceEvents {
-            var bundled = eventProperties(order)
-            if !products.isEmpty {
-                bundled["products"] = products.map { eventProperties(Self.bundledProduct($0)) }
-            }
-            client.logPurchase(productId: Self.bundledPurchaseName, currency: currency, price: total, quantity: 1, properties: bundled.nonEmpty)
+        if options.bundleCommerceEvents || products.isEmpty {
+            let total = (Self.decimal(properties["revenue"]) ?? Self.decimal(properties["total"])).map(Self.double) ?? 0
+            let purchase = BrazePurchase(productId: event.event, price: total, currency: currency, quantity: 1, properties: eventProperties(properties))
+            logPurchase(purchase, context: PurchaseContext(event: event, order: order, product: nil), to: client)
             return
         }
 
-        guard !products.isEmpty else {
-            client.logPurchase(productId: name, currency: currency, price: total, quantity: 1, properties: eventProperties(order).nonEmpty)
-            return
-        }
-
+        let idKeys = options.purchaseProductIdentifier == .name ? ["name"] : ["sku", "product_id", "name"]
+        var orderFields = properties
+        orderFields["products"] = nil
         for product in products {
-            let idKey = options.purchaseProductIdentifier == .name
-                ? "name"
-                : ["sku", "product_id"].first { product[$0].flatMap(Self.scalarString)?.isEmpty == false }
-            guard let idKey = idKey, let productId = product[idKey].flatMap(Self.scalarString), !productId.isEmpty else {
-                log("Dropped a product from \(name) with no \(options.purchaseProductIdentifier == .name ? "name" : "sku or product_id").")
+            guard let productId = idKeys.lazy.compactMap({ product[$0].flatMap(Self.scalarString) }).first(where: { !$0.isEmpty }) else {
+                log("Dropped a product from \(event.event) with no \(idKeys.joined(separator: " or ")).")
                 continue
             }
-            var fields = order
-            for (key, value) in product {
-                switch key {
-                case "sku", "price", "quantity", "currency":
-                    continue
-                case "product_id" where idKey == "product_id":
-                    continue
-                default:
-                    fields[Self.productFieldNames[key] ?? key] = value
-                }
-            }
+            let fields = orderFields.merging(product.filter { $0.key != "price" && $0.key != "quantity" }) { $1 }
             let price = Self.decimal(product["price"]).map(Self.double) ?? 0
             let quantity = product["quantity"]?.intValue ?? 1
-            client.logPurchase(productId: productId, currency: currency, price: price, quantity: quantity, properties: eventProperties(fields).nonEmpty)
+            let purchase = BrazePurchase(productId: productId, price: price, currency: currency, quantity: quantity, properties: eventProperties(fields))
+            logPurchase(purchase, context: PurchaseContext(event: event, order: order, product: JSON.object(product).dictionaryValue), to: client)
         }
     }
 
-    static func bundledProduct(_ product: [String: JSON]) -> [String: JSON] {
-        var result = [String: JSON]()
-        for (key, value) in product {
-            result[bundledProductFieldNames[key] ?? key] = value
+    private func logPurchase(_ purchase: BrazePurchase, context: PurchaseContext, to client: BrazeClient) {
+        var purchase = purchase
+        if let transformPurchase = options.transformPurchase {
+            guard let transformed = transformPurchase(purchase, context) else { return }
+            guard !transformed.productId.isEmpty else {
+                log("Dropped a purchase from \(context.event.event); transformPurchase returned an empty productId.")
+                return
+            }
+            purchase = transformed
         }
-        if let price = decimal(product["price"]) {
-            result["Total Product Amount"] = .number(price * (decimal(product["quantity"]) ?? 1))
-        }
-        return result
+        client.logPurchase(productId: purchase.productId, currency: purchase.currency, price: purchase.price, quantity: purchase.quantity, properties: purchase.properties.nonEmpty)
     }
 
     // MARK: - Values
 
     func eventProperties(_ properties: [String: JSON]) -> [String: Any] {
-        var result = [String: Any]()
-        for (key, value) in properties {
-            let strippedKey = Self.stripDollars(key)
-            guard !strippedKey.isEmpty, let converted = Self.propertyValue(value, stringify: options.stringifyAttributeValues) else { continue }
-            result[strippedKey] = converted
-        }
-        return result
+        return properties.compactMapValues { Self.propertyValue($0, stringify: options.stringifyAttributeValues) }
     }
 
     static func propertyValue(_ value: JSON, stringify: Bool) -> Any? {
@@ -280,10 +235,6 @@ extension BrazeDestination {
         case .object(let object):
             return object.compactMapValues { propertyValue($0, stringify: false) }
         }
-    }
-
-    static func stripDollars(_ key: String) -> String {
-        return String(key.drop { $0 == "$" })
     }
 
     static func scalarString(_ value: JSON) -> String? {

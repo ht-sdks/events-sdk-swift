@@ -14,23 +14,23 @@ import Hightouch
 public final class BrazeDestination: DestinationPlugin {
     public struct Options {
         public enum PurchaseProductIdentifier {
-            /// `product.sku`, falling back to `product.product_id`.
+            /// `product.sku`, falling back to `product.product_id`, then `product.name`.
             case sku
             /// `product.name`.
             case name
         }
 
         public var purchaseProductIdentifier: PurchaseProductIdentifier
-        /// Log one `eCommerce - purchase` per purchase event instead of one purchase per product.
+        /// Log one purchase per purchase event, with the event name as its product ID, instead of one purchase per product.
         public var bundleCommerceEvents: Bool
         /// Forward `screen` calls as Braze custom events.
         public var forwardScreenViews: Bool
         /// `track` event names logged as purchases. Case-sensitive.
         public var purchaseEventNames: [String]
-        /// Decides whether a `track` event is a purchase. When set, `purchaseEventNames` and `logPurchaseWhenRevenuePresent` are ignored.
+        /// Decides whether a `track` event is a purchase. When set, `purchaseEventNames` is ignored.
         public var isPurchaseEvent: ((TrackEvent) -> Bool)?
-        /// Treat any `track` call with a non-zero `revenue` property as a purchase.
-        public var logPurchaseWhenRevenuePresent: Bool
+        /// Changes each purchase before it's logged. Return `nil` to skip the purchase.
+        public var transformPurchase: ((BrazePurchase, PurchaseContext) -> BrazePurchase?)?
         /// Send user attribute and event property values as strings.
         public var stringifyAttributeValues: Bool
 
@@ -39,14 +39,14 @@ public final class BrazeDestination: DestinationPlugin {
                     forwardScreenViews: Bool = false,
                     purchaseEventNames: [String] = ["Order Completed", "Completed Order"],
                     isPurchaseEvent: ((TrackEvent) -> Bool)? = nil,
-                    logPurchaseWhenRevenuePresent: Bool = false,
+                    transformPurchase: ((BrazePurchase, PurchaseContext) -> BrazePurchase?)? = nil,
                     stringifyAttributeValues: Bool = false) {
             self.purchaseProductIdentifier = purchaseProductIdentifier
             self.bundleCommerceEvents = bundleCommerceEvents
             self.forwardScreenViews = forwardScreenViews
             self.purchaseEventNames = purchaseEventNames
             self.isPurchaseEvent = isPurchaseEvent
-            self.logPurchaseWhenRevenuePresent = logPurchaseWhenRevenuePresent
+            self.transformPurchase = transformPurchase
             self.stringifyAttributeValues = stringifyAttributeValues
         }
     }
@@ -116,6 +116,32 @@ public final class BrazeDestination: DestinationPlugin {
     public func reset() {
         perform { _ in self.saveUserState(UserState()) }
     }
+}
+
+/// A purchase the destination is about to log with Braze's `logPurchase`.
+public struct BrazePurchase {
+    public var productId: String
+    public var price: Double
+    public var currency: String
+    public var quantity: Int
+    public var properties: [String: Any]
+
+    public init(productId: String, price: Double, currency: String, quantity: Int, properties: [String: Any]) {
+        self.productId = productId
+        self.price = price
+        self.currency = currency
+        self.quantity = quantity
+        self.properties = properties
+    }
+}
+
+/// What a purchase passed to `transformPurchase` was built from.
+public struct PurchaseContext {
+    public let event: TrackEvent
+    /// The event's properties.
+    public let order: [String: Any]
+    /// The product this purchase came from, or `nil` for a per-order purchase or an order without products.
+    public let product: [String: Any]?
 }
 
 // MARK: - Readiness
