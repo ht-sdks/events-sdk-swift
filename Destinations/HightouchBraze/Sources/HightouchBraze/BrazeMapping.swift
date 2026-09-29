@@ -157,19 +157,19 @@ extension BrazeDestination {
             client.setAttributionData(network: field("source"), campaign: field("name"), adGroup: field("ad_group"), creative: field("ad_creative"))
         }
 
-        if isPurchase(event, name: name, properties: properties) {
+        if isPurchase(event, properties: properties) {
             logPurchases(name: name, properties: properties, to: client)
         } else {
             client.logCustomEvent(name: name, properties: eventProperties(properties).nonEmpty)
         }
     }
 
-    private func isPurchase(_ event: TrackEvent, name: String, properties: [String: JSON]) -> Bool {
+    private func isPurchase(_ event: TrackEvent, properties: [String: JSON]) -> Bool {
         if let isPurchaseEvent = options.isPurchaseEvent {
             return isPurchaseEvent(event)
         }
         let revenue = Self.decimal(properties["revenue"])
-        return options.purchaseEventNames.contains(name) || (options.logPurchaseWhenRevenuePresent && revenue != nil && revenue != 0)
+        return options.purchaseEventNames.contains(event.event) || (options.logPurchaseWhenRevenuePresent && revenue != nil && revenue != 0)
     }
 
     func forwardScreen(_ event: ScreenEvent, to client: BrazeClient) {
