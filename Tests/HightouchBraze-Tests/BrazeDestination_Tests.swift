@@ -439,6 +439,34 @@ final class BrazeDestination_Tests: XCTestCase {
         analytics.track(name: "Opened")
         XCTAssertTrue(client.calls.contains(.customEvent("Opened", nil)))
     }
+
+    func testMParticleMobilePurchaseRecipe() {
+        let orderNames = ["order_id": "Transaction Id", "revenue": "Total Amount", "tax": "Tax Amount", "shipping": "Shipping Amount"]
+        let productNames = ["name": "Name", "brand": "Brand", "category": "Category", "variant": "Variant", "position": "Position", "coupon": "Coupon Code"]
+        let passed: Set = ["sku", "product_id", "price", "quantity", "currency", "products"]
+        func renamed(_ values: [String: Any], _ names: [String: String]) -> [String: Any] {
+            var result = [String: Any]()
+            for (key, value) in values where !passed.contains(key) {
+                result[names[key] ?? key] = value
+            }
+            return result
+        }
+        let destination = makeDestination(.init(transformPurchase: { purchase, context in
+            var purchase = purchase
+            purchase.properties = renamed(context.order, orderNames)
+                .merging(renamed(context.product ?? [:], productNames)) { _, product in product }
+            return purchase
+        }))
+        track(destination, "Order Completed", [
+            "order_id": "o1", "revenue": 25, "currency": "USD",
+            "products": [["sku": "SKU1", "name": "Shirt", "price": 10, "quantity": 2, "brand": "Equinox", "coupon": "C1"]],
+        ])
+        XCTAssertEqual(client.calls, [
+            .purchase("SKU1", "USD", 10, 2, [
+                "Transaction Id": "o1", "Total Amount": 25, "Name": "Shirt", "Brand": "Equinox", "Coupon Code": "C1",
+            ]),
+        ])
+    }
 }
 
 #if canImport(BrazeKit)
