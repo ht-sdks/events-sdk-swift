@@ -7,6 +7,9 @@ import UIKit
 import Hightouch
 
 class ViewController: UIViewController {
+    private let names = ["Jane", "Bob", "Ada", "Maya", "Luis", "Priya", "Omar", "Chen"]
+    private let userIdField = UITextField()
+    private let nameField = UITextField()
     private let lastActionLabel = UILabel()
 
     private var analytics: Analytics? {
@@ -27,14 +30,28 @@ class ViewController: UIViewController {
         stack.translatesAutoresizingMaskIntoConstraints = false
         scrollView.addSubview(stack)
 
+        userIdField.placeholder = "User ID"
+        userIdField.autocapitalizationType = .none
+        nameField.placeholder = "First name"
+        nameField.autocapitalizationType = .words
+        for field in [userIdField, nameField] {
+            field.borderStyle = .roundedRect
+            field.autocorrectionType = .no
+            field.clearButtonMode = .whileEditing
+            stack.addArrangedSubview(field)
+        }
+        stack.addArrangedSubview(makeButton("New user", #selector(newUser)))
+
         lastActionLabel.font = .preferredFont(forTextStyle: .body)
         lastActionLabel.numberOfLines = 0
         lastActionLabel.text = " "
         stack.addArrangedSubview(lastActionLabel)
 
+        rollUser()
+
         let actions: [(String, Selector)] = [
-            ("Identify A", #selector(identifyA)),
-            ("Identify A again", #selector(identifyAAgain)),
+            ("Identify", #selector(identifyA)),
+            ("Identify again", #selector(identifyAAgain)),
             ("Change plan", #selector(changePlan)),
             ("Custom event", #selector(customEvent)),
             ("Purchase, two products", #selector(purchaseTwoProducts)),
@@ -42,7 +59,6 @@ class ViewController: UIViewController {
             ("Screen", #selector(screen)),
             ("Opt-out event", #selector(optOutEvent)),
             ("Reset", #selector(reset)),
-            ("Identify B", #selector(identifyB)),
         ]
         for (title, selector) in actions {
             stack.addArrangedSubview(makeButton(title, selector))
@@ -77,10 +93,19 @@ class ViewController: UIViewController {
         lastActionLabel.text = title
     }
 
-    private func userATraits(plan: String) -> [String: Any] {
-        [
-            "email": "jane@example.com",
-            "firstName": "Jane",
+    private func rollUser() {
+        userIdField.text = UUID().uuidString
+        nameField.text = names.randomElement()
+    }
+
+    private func traits(plan: String) -> [String: Any] {
+        let name = nameField.text ?? ""
+        let email = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .replacingOccurrences(of: " ", with: "") + "@example.com"
+        return [
+            "email": email,
+            "firstName": name,
             "gender": "male",
             "plan": plan,
             "address": [
@@ -90,18 +115,23 @@ class ViewController: UIViewController {
         ]
     }
 
+    @objc private func newUser() {
+        rollUser()
+        show("New user")
+    }
+
     @objc private func identifyA() {
-        analytics?.identify(userId: "user-a", traits: userATraits(plan: "pro"))
-        show("Identify A")
+        analytics?.identify(userId: userIdField.text ?? "", traits: traits(plan: "pro"))
+        show("Identify")
     }
 
     @objc private func identifyAAgain() {
-        analytics?.identify(userId: "user-a", traits: userATraits(plan: "pro"))
-        show("Identify A again")
+        analytics?.identify(userId: userIdField.text ?? "", traits: traits(plan: "pro"))
+        show("Identify again")
     }
 
     @objc private func changePlan() {
-        analytics?.identify(userId: "user-a", traits: userATraits(plan: "enterprise"))
+        analytics?.identify(userId: userIdField.text ?? "", traits: traits(plan: "enterprise"))
         show("Change plan")
     }
 
@@ -172,13 +202,5 @@ class ViewController: UIViewController {
     @objc private func reset() {
         analytics?.reset()
         show("Reset")
-    }
-
-    @objc private func identifyB() {
-        analytics?.identify(userId: "user-b", traits: [
-            "email": "bob@example.com",
-            "firstName": "Bob",
-        ])
-        show("Identify B")
     }
 }
