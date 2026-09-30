@@ -58,6 +58,7 @@ class ViewController: UIViewController {
             ("Purchase, custom name", #selector(purchaseCustomName)),
             ("Screen", #selector(screen)),
             ("Opt-out event", #selector(optOutEvent)),
+            ("Flush", #selector(flush)),
             ("Reset", #selector(reset)),
         ]
         for (title, selector) in actions {
@@ -197,6 +198,11 @@ class ViewController: UIViewController {
             return event
         }])
         show("Opt-out event")
+    }
+
+    @objc private func flush() {
+        analytics?.flush()
+        show("Flush")
     }
 
     @objc private func reset() {
