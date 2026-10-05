@@ -42,19 +42,15 @@ public final class BrazeDestination: DestinationPlugin {
         public var forwardScreenViews: Bool
         /// Changes each purchase before it's logged. Return `nil` to skip the purchase.
         public var transformPurchase: ((BrazePurchase, PurchaseContext) -> BrazePurchase?)?
-        /// Send user attribute and event property values as strings.
-        public var stringifyAttributeValues: Bool
 
         public init(purchaseDetection: PurchaseDetection = .eventNames(["Order Completed", "Completed Order"]),
                     purchaseGrouping: PurchaseGrouping = .perProduct(identifier: .sku),
                     forwardScreenViews: Bool = false,
-                    transformPurchase: ((BrazePurchase, PurchaseContext) -> BrazePurchase?)? = nil,
-                    stringifyAttributeValues: Bool = false) {
+                    transformPurchase: ((BrazePurchase, PurchaseContext) -> BrazePurchase?)? = nil) {
             self.purchaseDetection = purchaseDetection
             self.purchaseGrouping = purchaseGrouping
             self.forwardScreenViews = forwardScreenViews
             self.transformPurchase = transformPurchase
-            self.stringifyAttributeValues = stringifyAttributeValues
         }
     }
 

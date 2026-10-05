@@ -156,10 +156,10 @@ final class BrazeDestination_Tests: XCTestCase {
         ])
     }
 
-    func testStringifyAttributeValues() {
-        let destination = makeDestination(.init(stringifyAttributeValues: true))
-        identify(destination, ["count": 3, "active": true])
-        track(destination, "Viewed", ["count": 3, "nested": ["a": 1]])
+    func testExplicitStringValues() {
+        let destination = makeDestination()
+        identify(destination, ["count": "3", "active": "true"])
+        track(destination, "Viewed", ["count": "3", "nested": #"{"a":1}"#])
         XCTAssertEqual(client.calls, [
             .update(.customAttribute("active", .string("true"))),
             .update(.customAttribute("count", .string("3"))),

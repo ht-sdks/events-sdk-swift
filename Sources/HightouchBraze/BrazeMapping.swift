@@ -75,18 +75,14 @@ extension BrazeDestination {
     }
 
     private func attributeValue(_ value: JSON) -> BrazeAttributeValue? {
-        let stringify = options.stringifyAttributeValues
         switch value {
         case .null:
             return nil
         case .string(let string):
             return .string(string)
         case .bool(let bool):
-            return stringify ? .string(String(bool)) : .bool(bool)
+            return .bool(bool)
         case .number(let number):
-            if stringify {
-                return .string(number.description)
-            }
             return Self.integer(number).map { .int($0) } ?? .double(NSDecimalNumber(decimal: number).doubleValue)
         case .array(let items):
             return .stringArray(items.compactMap { item in
@@ -217,15 +213,13 @@ extension BrazeDestination {
     // MARK: - Values
 
     func eventProperties(_ properties: [String: JSON]) -> [String: Any] {
-        return properties.compactMapValues { Self.propertyValue($0, stringify: options.stringifyAttributeValues) }
+        return properties.compactMapValues { Self.propertyValue($0) }
     }
 
-    static func propertyValue(_ value: JSON, stringify: Bool) -> Any? {
+    static func propertyValue(_ value: JSON) -> Any? {
         switch value {
         case .null:
             return nil
-        case _ where stringify:
-            return scalarString(value) ?? jsonString(value)
         case .string(let string):
             return string
         case .bool(let bool):
@@ -233,9 +227,9 @@ extension BrazeDestination {
         case .number(let number):
             return integer(number).map { $0 as Any } ?? double(number)
         case .array(let items):
-            return items.compactMap { propertyValue($0, stringify: false) }
+            return items.compactMap { propertyValue($0) }
         case .object(let object):
-            return object.compactMapValues { propertyValue($0, stringify: false) }
+            return object.compactMapValues { propertyValue($0) }
         }
     }
 
