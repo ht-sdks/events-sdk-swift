@@ -14,6 +14,8 @@ in-app message presentation. No separate local destination package is needed.
 
 `perOrder` at the top of `AppDelegate.swift` defaults to `false` (one Braze purchase per product). Set it to `true` and relaunch to log one purchase per order.
 
+Use `purchaseDetection` to select event names or a matcher, and `purchaseGrouping` to select per-product purchases with SKU/name identifiers or one purchase per order. For legacy mappings, use `transformPurchase` and convert only the fields that need string values.
+
 ## Checking results
 
 This sandbox has no Event User Log. Confirm attributes, custom events, and purchases on the Braze user profile, and watch the Xcode console.
