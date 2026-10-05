@@ -7,7 +7,4 @@
    <FileRef
       location = "container:BrazeExample.xcodeproj">
    </FileRef>
-   <FileRef
-      location = "absolute:/Users/jonathanchaffer/Repos/Hightouch Dev/events-sdk-swift/Destinations/HightouchBraze">
-   </FileRef>
 </Workspace>
