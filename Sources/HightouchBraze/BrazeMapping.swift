@@ -168,7 +168,7 @@ extension BrazeDestination {
         if case .string(let value)? = properties["currency"], value.count == 3 {
             currency = value
         }
-        let order = event.properties?.dictionaryValue ?? [:]
+        let order = eventProperties(properties)
         var products = [[String: JSON]]()
         if case .array(let items)? = properties["products"] {
             products = items.compactMap { item in
@@ -193,7 +193,7 @@ extension BrazeDestination {
             let price = Self.decimal(product["price"]).map(Self.double) ?? 0
             let quantity = product["quantity"]?.intValue ?? 1
             let purchase = BrazePurchase(productId: productId, price: price, currency: currency, quantity: quantity, properties: eventProperties(fields))
-            logPurchase(purchase, context: PurchaseContext(event: event, order: order, product: JSON.object(product).dictionaryValue), to: client)
+            logPurchase(purchase, context: PurchaseContext(event: event, order: order, product: eventProperties(product)), to: client)
         }
     }
 

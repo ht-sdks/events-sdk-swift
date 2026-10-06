@@ -292,6 +292,39 @@ final class BrazeDestination_Tests: XCTestCase {
         XCTAssertEqual(client.calls, [.purchase("Order Completed", "USD", 0, 1, ["products": [["sku": "SKU1"]]])])
     }
 
+    func testPurchaseContextContainsPlainValuesForCompatibilityTransforms() {
+        for isPerProduct in [true, false] {
+            let grouping: BrazeDestination.Options.PurchaseGrouping = isPerProduct ? .perProduct(identifier: .sku) : .perOrder
+            client.calls.removeAll()
+            let destination = makeDestination(.init(purchaseGrouping: grouping, transformPurchase: { purchase, context in
+                let products = context.order["products"] as! [[String: Any]]
+                let product = context.product ?? products[0]
+                let details = product["details"] as! [String: Any]
+                XCTAssertEqual(String(describing: context.order["channel"]!), "app")
+                XCTAssertEqual(String(describing: product["name"]!), "Resistance Band")
+                XCTAssertEqual(String(describing: details["color"]!), "blue")
+                XCTAssertEqual(String(describing: product["price"]!), "15")
+                XCTAssertEqual(String(describing: details["available"]!), "true")
+                XCTAssertEqual(String(describing: (details["sizes"] as! [Any])[0]), "42")
+                var purchase = purchase
+                purchase.properties = [
+                    "Name": String(describing: product["name"]!),
+                    "channel": String(describing: context.order["channel"]!),
+                    "color": String(describing: details["color"]!),
+                ]
+                return purchase
+            }))
+            track(destination, "Order Completed", [
+                "channel": "app", "revenue": 30,
+                "products": [["sku": "RB-100", "name": "Resistance Band", "price": 15, "quantity": 2,
+                              "details": ["color": "blue", "available": true, "sizes": [42]]]],
+            ])
+            XCTAssertEqual(client.calls, [.purchase(isPerProduct ? "RB-100" : "Order Completed", "USD",
+                                                   isPerProduct ? 15 : 30, isPerProduct ? 2 : 1,
+                                                   ["Name": "Resistance Band", "channel": "app", "color": "blue"])])
+        }
+    }
+
     func testTransformPurchaseCanSetMissingProductId() {
         let destination = makeDestination(.init(transformPurchase: { purchase, context in
             var purchase = purchase
