@@ -1,0 +1,238 @@
+//
+//  BrazeDestination.swift
+//  HightouchBraze
+//
+
+import Foundation
+import Hightouch
+
+/**
+ Forwards Hightouch events to the Braze Swift SDK on the device, so Braze can evaluate in-app message
+ triggers and Content Cards in real time. The destination only forwards data; display is up to your app
+ through the exposed `braze` instance.
+ */
+public final class BrazeDestination: DestinationPlugin {
+    public struct Options {
+        public enum PurchaseProductIdentifier {
+            /// `product.sku`, falling back to `product.product_id`, then `product.name`.
+            case sku
+            /// `product.name`.
+            case name
+        }
+
+        public enum PurchaseDetection {
+            /// `track` events with one of these names. Case-sensitive.
+            case eventNames([String])
+            /// `track` events for which the closure returns `true`.
+            case matcher((TrackEvent) -> Bool)
+        }
+
+        public enum PurchaseGrouping {
+            /// One purchase per product. An event without products is logged as one purchase with the event name as its product ID.
+            case perProduct(identifier: PurchaseProductIdentifier)
+            /// One purchase per purchase event, with the event name as its product ID.
+            case perOrder
+        }
+
+        /// Which `track` events are logged as purchases.
+        public var purchaseDetection: PurchaseDetection
+        /// How a purchase event is split into Braze purchases.
+        public var purchaseGrouping: PurchaseGrouping
+        /// Forward `screen` calls as Braze custom events.
+        public var forwardScreenViews: Bool
+        /// Changes each purchase before it's logged. Return `nil` to skip the purchase.
+        public var transformPurchase: ((BrazePurchase, PurchaseContext) -> BrazePurchase?)?
+
+        public init(purchaseDetection: PurchaseDetection = .eventNames(["Order Completed", "Completed Order"]),
+                    purchaseGrouping: PurchaseGrouping = .perProduct(identifier: .sku),
+                    forwardScreenViews: Bool = false,
+                    transformPurchase: ((BrazePurchase, PurchaseContext) -> BrazePurchase?)? = nil) {
+            self.purchaseDetection = purchaseDetection
+            self.purchaseGrouping = purchaseGrouping
+            self.forwardScreenViews = forwardScreenViews
+            self.transformPurchase = transformPurchase
+        }
+    }
+
+    struct UserState: Codable, Equatable {
+        var userId: String?
+        var attributes: [String: String] = [:]
+    }
+
+    static let maxPendingCount = 1000
+    static let userStateKey = "com.hightouch.braze.userState"
+
+    public let type = PluginType.destination
+    public let key = "Appboy"
+    public let timeline = Timeline()
+    public weak var analytics: Analytics? = nil
+
+    let options: Options
+    private let userDefaults: UserDefaults
+    // Recursive so an event tracked re-entrantly from inside a Braze call can't deadlock the host app.
+    private let lock = NSRecursiveLock()
+    private var client: BrazeClient?
+    private var pending = [(BrazeClient) -> Void]()
+    private var readyCallbacks = [(BrazeClient) -> Void]()
+    private(set) var userState: UserState
+
+    /// Creates the destination without a Braze instance. Events are queued until you call `setBraze(_:)`.
+    public init(options: Options = Options()) {
+        self.options = options
+        self.userDefaults = .standard
+        self.userState = Self.loadUserState(from: .standard)
+    }
+
+    init(options: Options, userDefaults: UserDefaults) {
+        self.options = options
+        self.userDefaults = userDefaults
+        self.userState = Self.loadUserState(from: userDefaults)
+    }
+
+    public func update(settings: Settings, type: UpdateType) {
+        // Braze is configured in code, so the Hightouch settings endpoint never lists this destination; without this the core would skip it.
+        analytics?.manuallyEnableDestination(plugin: self)
+    }
+
+    public func identify(event: IdentifyEvent) -> IdentifyEvent? {
+        guard isEnabled(for: event) else { return event }
+        perform { self.forwardIdentify(event, to: $0) }
+        return event
+    }
+
+    public func track(event: TrackEvent) -> TrackEvent? {
+        guard isEnabled(for: event) else { return event }
+        perform { self.forwardTrack(event, to: $0) }
+        return event
+    }
+
+    public func screen(event: ScreenEvent) -> ScreenEvent? {
+        guard options.forwardScreenViews, isEnabled(for: event) else { return event }
+        perform { self.forwardScreen(event, to: $0) }
+        return event
+    }
+
+    public func flush() {
+        perform { $0.requestImmediateDataFlush() }
+    }
+
+    public func reset() {
+        perform { _ in self.saveUserState(UserState()) }
+    }
+}
+
+/// A purchase the destination is about to log with Braze's `logPurchase`.
+public struct BrazePurchase {
+    public var productId: String
+    public var price: Double
+    public var currency: String
+    public var quantity: Int
+    public var properties: [String: Any]
+
+    public init(productId: String, price: Double, currency: String, quantity: Int, properties: [String: Any]) {
+        self.productId = productId
+        self.price = price
+        self.currency = currency
+        self.quantity = quantity
+        self.properties = properties
+    }
+}
+
+/// What a purchase passed to `transformPurchase` was built from.
+public struct PurchaseContext {
+    public let event: TrackEvent
+    /// The event's properties.
+    public let order: [String: Any]
+    /// The product this purchase came from, or `nil` for a per-order purchase or an order without products.
+    public let product: [String: Any]?
+}
+
+// MARK: - Readiness
+
+extension BrazeDestination {
+    var currentClient: BrazeClient? {
+        lock.lock()
+        defer { lock.unlock() }
+        return client
+    }
+
+    func start(client: BrazeClient) {
+        lock.lock()
+        self.client = client
+        let replay = pending
+        pending.removeAll()
+        replay.forEach { $0(client) }
+        let callbacks = readyCallbacks
+        readyCallbacks.removeAll()
+        lock.unlock()
+        callbacks.forEach { $0(client) }
+    }
+
+    func onClientReady(_ callback: @escaping (BrazeClient) -> Void) {
+        lock.lock()
+        guard let client = client else {
+            readyCallbacks.append(callback)
+            lock.unlock()
+            return
+        }
+        lock.unlock()
+        callback(client)
+    }
+
+    // Everything runs under the lock so Braze calls and the attribute cache stay in event order across threads.
+    private func perform(_ work: @escaping (BrazeClient) -> Void) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let client = client else {
+            if pending.count >= Self.maxPendingCount {
+                pending.removeFirst()
+            }
+            pending.append(work)
+            return
+        }
+        work(client)
+    }
+
+    private func isEnabled(for event: RawEvent) -> Bool {
+        let integrations = event.integrations?.dictionaryValue
+        let own = integrations?[key] as? Bool
+        if own == false { return false }
+        return !(integrations?["All"] as? Bool == false && own != true)
+    }
+}
+
+// MARK: - Identity
+
+extension BrazeDestination {
+    private func forwardIdentify(_ event: IdentifyEvent, to client: BrazeClient) {
+        var state = userState
+        if let userId = event.userId, !userId.isEmpty, userId != state.userId {
+            client.changeUser(userId: userId)
+            state = UserState(userId: userId)
+        }
+        for update in userUpdates(from: event.traits) where state.attributes[update.cacheKey] != update.cacheValue {
+            client.update(update)
+            state.attributes[update.cacheKey] = update.cacheValue
+        }
+        if state != userState {
+            saveUserState(state)
+        }
+    }
+
+    private static func loadUserState(from userDefaults: UserDefaults) -> UserState {
+        guard let data = userDefaults.data(forKey: userStateKey),
+              let state = try? JSONDecoder().decode(UserState.self, from: data) else { return UserState() }
+        return state
+    }
+
+    private func saveUserState(_ state: UserState) {
+        userState = state
+        if let data = try? JSONEncoder().encode(state) {
+            userDefaults.set(data, forKey: Self.userStateKey)
+        }
+    }
+
+    func log(_ message: String) {
+        analytics?.log(message: "BrazeDestination: \(message)")
+    }
+}

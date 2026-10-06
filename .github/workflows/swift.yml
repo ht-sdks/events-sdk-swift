@@ -36,20 +36,20 @@ jobs:
         run: swift test --enable-test-discovery
 
   build_and_test_ios:
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
-          xcode-version: "15.4"
+          xcode-version: "26.3"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: xcodebuild -scheme Hightouch-Package test -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 15'
+      - run: xcodebuild -scheme Hightouch-Package test -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
 
   build_and_test_tvos:
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
-          xcode-version: "15.4"
+          xcode-version: "26.3"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: xcodebuild -scheme Hightouch-Package test -sdk appletvsimulator -destination 'platform=tvOS Simulator,name=Apple TV'
 
