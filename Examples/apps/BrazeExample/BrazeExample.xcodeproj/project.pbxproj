@@ -13,7 +13,6 @@
 		46E3836C265837EA00BA2502 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 46E3836A265837EA00BA2502 /* Main.storyboard */; };
 		46E3836E265837EB00BA2502 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 46E3836D265837EB00BA2502 /* Assets.xcassets */; };
 		46E38371265837EB00BA2502 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 46E3836F265837EB00BA2502 /* LaunchScreen.storyboard */; };
-		46E3837A2658387D00BA2502 /* Sovran in Frameworks */ = {isa = PBXBuildFile; productRef = 46E383792658387D00BA2502 /* Sovran */; };
 		8E5F20112AA2C69D008AB15E /* Hightouch in Frameworks */ = {isa = PBXBuildFile; productRef = 8E5F20102AA2C69D008AB15E /* Hightouch */; };
 		D70587C8306C166700B8E1B5 /* HightouchBraze in Frameworks */ = {isa = PBXBuildFile; productRef = D70587C7306C166700B8E1B5 /* HightouchBraze */; };
 		D70587CB306C16AD00B8E1B5 /* BrazeKit in Frameworks */ = {isa = PBXBuildFile; productRef = D70587CA306C16AD00B8E1B5 /* BrazeKit */; };
@@ -41,7 +40,6 @@
 			files = (
 				D70587CB306C16AD00B8E1B5 /* BrazeKit in Frameworks */,
 				8E5F20112AA2C69D008AB15E /* Hightouch in Frameworks */,
-				46E3837A2658387D00BA2502 /* Sovran in Frameworks */,
 				D70587CD306C16AD00B8E1B5 /* BrazeUI in Frameworks */,
 				D70587C8306C166700B8E1B5 /* HightouchBraze in Frameworks */,
 			);
@@ -108,7 +106,6 @@
 			);
 			name = BrazeExample;
 			packageProductDependencies = (
-				46E383792658387D00BA2502 /* Sovran */,
 				8E5F20102AA2C69D008AB15E /* Hightouch */,
 				D70587C7306C166700B8E1B5 /* HightouchBraze */,
 				D70587CA306C16AD00B8E1B5 /* BrazeKit */,
@@ -142,7 +139,6 @@
 			);
 			mainGroup = 46E38358265837EA00BA2502;
 			packageReferences = (
-				46E383782658387D00BA2502 /* XCRemoteSwiftPackageReference "Sovran-Swift" */,
 				D70587C9306C16AD00B8E1B5 /* XCRemoteSwiftPackageReference "braze-swift-sdk" */,
 			);
 			productRefGroup = 46E38362265837EA00BA2502 /* Products */;
@@ -386,14 +382,6 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		46E383782658387D00BA2502 /* XCRemoteSwiftPackageReference "Sovran-Swift" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/segmentio/Sovran-Swift.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 1.0.1;
-			};
-		};
 		D70587C9306C16AD00B8E1B5 /* XCRemoteSwiftPackageReference "braze-swift-sdk" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/braze-inc/braze-swift-sdk";
@@ -405,11 +393,6 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		46E383792658387D00BA2502 /* Sovran */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 46E383782658387D00BA2502 /* XCRemoteSwiftPackageReference "Sovran-Swift" */;
-			productName = Sovran;
-		};
 		8E5F20102AA2C69D008AB15E /* Hightouch */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = Hightouch;
