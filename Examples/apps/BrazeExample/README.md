@@ -18,4 +18,4 @@ Use `purchaseDetection` to select event names or a matcher, and `purchaseGroupin
 
 ## Checking results
 
-This sandbox has no Event User Log. Confirm attributes, custom events, and purchases on the Braze user profile, and watch the Xcode console.
+Confirm attributes, custom events, and purchases on the Braze user profile, and watch the Xcode console.
