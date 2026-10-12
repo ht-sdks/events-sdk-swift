@@ -22,14 +22,14 @@ internal enum BrazeAttributeValue: Equatable {
 }
 
 internal enum BrazeUserUpdate: Equatable {
-    case firstName(String)
-    case lastName(String)
-    case email(String)
-    case phoneNumber(String)
-    case gender(BrazeGender)
-    case dateOfBirth(Date)
-    case homeCity(String)
-    case country(String)
+    case firstName(String?)
+    case lastName(String?)
+    case email(String?)
+    case phoneNumber(String?)
+    case gender(BrazeGender?)
+    case dateOfBirth(Date?)
+    case homeCity(String?)
+    case country(String?)
     case emailSubscription(BrazeSubscriptionState)
     case pushSubscription(BrazeSubscriptionState)
     /// A `nil` value unsets the attribute.
@@ -78,7 +78,7 @@ internal final class BrazeKitClient: BrazeClient {
         case .lastName(let value): user.set(lastName: value)
         case .email(let value): user.set(email: value)
         case .phoneNumber(let value): user.set(phoneNumber: value)
-        case .gender(let value): user.set(gender: value.braze)
+        case .gender(let value): user.set(gender: value?.braze)
         case .dateOfBirth(let value): user.set(dateOfBirth: value)
         case .homeCity(let value): user.set(homeCity: value)
         case .country(let value): user.set(country: value)

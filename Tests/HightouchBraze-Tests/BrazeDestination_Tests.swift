@@ -111,6 +111,45 @@ final class BrazeDestination_Tests: XCTestCase {
         ])
     }
 
+    func testNullClearsStandardAttributesAndPreservesAliasPrecedence() {
+        let destination = makeDestination()
+        let values: [String: Any] = [
+            "firstName": "Ada", "lastName": "Lovelace", "email": "ada@example.com",
+            "phone": "555-0100", "gender": "female", "birthday": "1990-05-12",
+            "address": ["city": "London", "country": "GB"],
+        ]
+        identify(destination, values)
+        let original = client.calls
+        client.calls.removeAll()
+        identify(destination)
+        XCTAssertEqual(client.calls, [])
+        let clears: [String: Any] = [
+            "firstName": NSNull(), "first_name": "Ignored", "lastName": NSNull(), "last_name": "Ignored",
+            "email": NSNull(), "phone": NSNull(), "gender": NSNull(),
+            "birthday": NSNull(), "dob": "2000-01-01",
+            "address": ["city": NSNull(), "country": NSNull()], "home_city": "Ignored", "country": "US",
+        ]
+        identify(destination, clears)
+        XCTAssertEqual(client.calls, [
+            .update(.firstName(nil)), .update(.lastName(nil)), .update(.email(nil)),
+            .update(.phoneNumber(nil)), .update(.gender(nil)), .update(.dateOfBirth(nil)),
+            .update(.homeCity(nil)), .update(.country(nil)),
+        ])
+        client.calls.removeAll()
+        identify(makeDestination(), clears)
+        XCTAssertEqual(client.calls, [])
+        identify(destination, values)
+        XCTAssertEqual(client.calls, original)
+    }
+
+    func testNullClearsAliasAttributes() {
+        let destination = makeDestination()
+        identify(destination, ["first_name": NSNull(), "last_name": NSNull(), "dob": NSNull(),
+                               "home_city": NSNull(), "country": NSNull()])
+        XCTAssertEqual(client.calls, [.update(.firstName(nil)), .update(.lastName(nil)),
+                                      .update(.dateOfBirth(nil)), .update(.homeCity(nil)), .update(.country(nil))])
+    }
+
     func testBrazeLocationNames() {
         let destination = makeDestination()
         identify(destination, ["home_city": "Austin", "country": "US"])

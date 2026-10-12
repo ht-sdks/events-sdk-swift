@@ -26,42 +26,50 @@ extension BrazeDestination {
         if case .object(let value)? = traits["address"] {
             address = value
         }
-        func string(_ keys: String...) -> String? {
-            return keys.lazy.compactMap { traits[$0].flatMap(Self.scalarString) }.first
+        func pick(_ keys: String...) -> JSON? {
+            return keys.lazy.compactMap { traits[$0] }.first
         }
 
         var updates = [BrazeUserUpdate]()
-        func add(_ value: String?, _ makeUpdate: (String) -> BrazeUserUpdate) {
-            if let value = value {
-                updates.append(makeUpdate(value))
+        func add(_ value: JSON?, _ makeUpdate: (String?) -> BrazeUserUpdate) {
+            guard let value = value else { return }
+            if case .null = value {
+                updates.append(makeUpdate(nil))
+            } else if let string = Self.scalarString(value) {
+                updates.append(makeUpdate(string))
             }
         }
-        add(string("firstName", "first_name"), BrazeUserUpdate.firstName)
-        add(string("lastName", "last_name"), BrazeUserUpdate.lastName)
-        add(string("email"), BrazeUserUpdate.email)
-        add(string("phone"), BrazeUserUpdate.phoneNumber)
-        if let value = string("gender") {
+        add(pick("firstName", "first_name"), BrazeUserUpdate.firstName)
+        add(pick("lastName", "last_name"), BrazeUserUpdate.lastName)
+        add(pick("email"), BrazeUserUpdate.email)
+        add(pick("phone"), BrazeUserUpdate.phoneNumber)
+        if case .null? = traits["gender"] {
+            updates.append(.gender(nil))
+        } else if let value = traits["gender"].flatMap(Self.scalarString) {
             if let gender = Self.gender(from: value) {
                 updates.append(.gender(gender))
             } else {
                 log("Dropped unrecognized gender \"\(value)\".")
             }
         }
-        if let value = string("birthday", "dob") {
+        let birthday = pick("birthday", "dob")
+        if case .null? = birthday {
+            updates.append(.dateOfBirth(nil))
+        } else if let value = birthday.flatMap(Self.scalarString) {
             if let date = Self.dateOfBirth(from: value) {
                 updates.append(.dateOfBirth(date))
             } else {
                 log("Dropped birthday \"\(value)\"; expected an ISO 8601 or yyyy-MM-dd date.")
             }
         }
-        add(address["city"].flatMap(Self.scalarString) ?? string("home_city"), BrazeUserUpdate.homeCity)
-        add(address["country"].flatMap(Self.scalarString) ?? string("country"), BrazeUserUpdate.country)
+        add(address["city"] ?? pick("home_city"), BrazeUserUpdate.homeCity)
+        add(address["country"] ?? pick("country"), BrazeUserUpdate.country)
         for (key, value) in address.sorted(by: { $0.key < $1.key }) where key != "city" && key != "country" {
             updates.append(.customAttribute(key, attributeValue(value)))
         }
         for (key, makeUpdate) in [("email_subscribe", BrazeUserUpdate.emailSubscription), ("push_subscribe", BrazeUserUpdate.pushSubscription)] {
-            guard let value = string(key) else { continue }
-            if let state = Self.subscriptionState(from: value) {
+            guard let value = traits[key] else { continue }
+            if let string = Self.scalarString(value), let state = Self.subscriptionState(from: string) {
                 updates.append(makeUpdate(state))
             } else {
                 log("Dropped \(key) value \"\(value)\"; expected opted_in, subscribed, or unsubscribed.")
