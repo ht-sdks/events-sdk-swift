@@ -32,6 +32,15 @@ analytics.add(plugin: BrazeDestination(
 ))
 ```
 
+Purchase events must supply a `currency` that normalizes to three uppercase ASCII
+letters (`[A-Z]{3}`). Codes are trimmed and uppercased; Braze determines which
+currency codes it supports. To use an explicit fallback for missing or invalid values, pass
+`options: .init(defaultCurrency: "USD")` when creating the destination. There is
+no implicit currency default. Invalid purchases without a valid fallback are
+rejected and reported to `Configuration.errorHandler` as
+`AnalyticsError.pluginError(BrazeDestinationError)`; `track` itself is nonthrowing.
+The same validation applies to currencies returned by `transformPurchase`.
+
 The adapter supports iOS, tvOS, Mac Catalyst, and visionOS. BrazeKit is linked only
 by the `HightouchBraze` target on those platforms; SwiftPM may still resolve and
 download Braze dependencies for consumers of other products. Apps choose whether

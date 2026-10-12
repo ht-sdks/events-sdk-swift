@@ -40,16 +40,22 @@ public final class BrazeDestination: DestinationPlugin {
         public var purchaseGrouping: PurchaseGrouping
         /// Forward `screen` calls as Braze custom events.
         public var forwardScreenViews: Bool
+        /// Fallback for missing or invalid purchase currencies. No implicit default.
+        /// Must normalize to three ASCII letters; whitespace and case are normalized.
+        /// Braze determines which currency codes it supports.
+        public var defaultCurrency: String?
         /// Changes each purchase before it's logged. Return `nil` to skip the purchase.
         public var transformPurchase: ((BrazePurchase, PurchaseContext) -> BrazePurchase?)?
 
         public init(purchaseDetection: PurchaseDetection = .eventNames(["Order Completed", "Completed Order"]),
                     purchaseGrouping: PurchaseGrouping = .perProduct(identifier: .sku),
                     forwardScreenViews: Bool = false,
+                    defaultCurrency: String? = nil,
                     transformPurchase: ((BrazePurchase, PurchaseContext) -> BrazePurchase?)? = nil) {
             self.purchaseDetection = purchaseDetection
             self.purchaseGrouping = purchaseGrouping
             self.forwardScreenViews = forwardScreenViews
+            self.defaultCurrency = defaultCurrency
             self.transformPurchase = transformPurchase
         }
     }
@@ -102,7 +108,13 @@ public final class BrazeDestination: DestinationPlugin {
 
     public func track(event: TrackEvent) -> TrackEvent? {
         guard isEnabled(for: event) else { return event }
-        perform { self.forwardTrack(event, to: $0) }
+        perform { client in
+            do {
+                try self.forwardTrack(event, to: client)
+            } catch {
+                self.analytics?.reportInternalError(AnalyticsError.pluginError(error))
+            }
+        }
         return event
     }
 
@@ -118,6 +130,21 @@ public final class BrazeDestination: DestinationPlugin {
 
     public func reset() {
         perform { _ in self.saveUserState(UserState()) }
+    }
+}
+
+/// Purchase validation errors reported through `Configuration.errorHandler` as `AnalyticsError.pluginError`.
+public enum BrazeDestinationError: Error, LocalizedError, Equatable {
+    case invalidCurrency(String?)
+    case invalidDefaultCurrency(String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .invalidCurrency(let value):
+            return "Braze purchase rejected: invalid or missing currency (\(value ?? "nil")). Send a three-letter currency code or configure defaultCurrency."
+        case .invalidDefaultCurrency(let value):
+            return "Braze purchase rejected: defaultCurrency (\(value)) must be a three-letter currency code."
+        }
     }
 }
 

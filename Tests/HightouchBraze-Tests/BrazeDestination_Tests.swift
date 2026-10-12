@@ -235,14 +235,106 @@ final class BrazeDestination_Tests: XCTestCase {
         ])
     }
 
+    func testPurchaseCurrencyNormalization() {
+        let destination = makeDestination()
+        for (input, expected) in [(" eur\n", "EUR"), ("uSd", "USD"), ("btc", "BTC"), (" zzz ", "ZZZ")] {
+            client.calls.removeAll()
+            track(destination, "Order Completed", ["currency": input, "total": 12])
+            XCTAssertEqual(client.calls, [.purchase("Order Completed", expected, 12, 1, ["currency": input, "total": 12])])
+        }
+    }
+
+    func testInvalidPurchaseCurrencyThrowsWithoutDefault() throws {
+        let destination = makeDestination()
+        for value: Any? in [nil, NSNull(), 123, "", "   ", "dollars", "US", "123", "US1", "€€€", "éur", "US D"] {
+            let properties = value.map { ["currency": $0] } ?? [:]
+            let event = TrackEvent(event: "Order Completed", properties: try JSON(properties))
+            XCTAssertThrowsError(try destination.forwardTrack(event, to: client)) {
+                XCTAssertEqual($0 as? BrazeDestinationError, .invalidCurrency(value as? String))
+            }
+        }
+        XCTAssertTrue(client.calls.isEmpty)
+    }
+
+    func testExplicitDefaultCurrencyIsNormalizedAndOnlyUsedWhenNeeded() {
+        let destination = makeDestination(.init(defaultCurrency: " gbp\n"))
+        track(destination, "Order Completed")
+        track(destination, "Order Completed", ["currency": "US1"])
+        track(destination, "Order Completed", ["currency": "eur"])
+        XCTAssertEqual(client.calls, [
+            .purchase("Order Completed", "GBP", 0, 1, nil),
+            .purchase("Order Completed", "GBP", 0, 1, ["currency": "US1"]),
+            .purchase("Order Completed", "EUR", 0, 1, ["currency": "eur"]),
+        ])
+    }
+
+    func testCurrencyRecognitionIsLeftToBrazeWithAnExplicitDefault() {
+        let destination = makeDestination(.init(defaultCurrency: " zzz "))
+        track(destination, "Order Completed", ["currency": "abc", "revenue": 2, "quantity": 1])
+        track(destination, "Order Completed", ["revenue": 2, "quantity": 1])
+        XCTAssertEqual(client.calls, [
+            .purchase("Order Completed", "ABC", 2, 1, ["currency": "abc", "revenue": 2, "quantity": 1]),
+            .purchase("Order Completed", "ZZZ", 2, 1, ["revenue": 2, "quantity": 1]),
+        ])
+    }
+
+    func testInvalidDefaultCurrencyThrows() {
+        let destination = makeDestination(.init(defaultCurrency: "US1"))
+        XCTAssertThrowsError(try destination.forwardTrack(TrackEvent(event: "Order Completed", properties: nil), to: client)) {
+            XCTAssertEqual($0 as? BrazeDestinationError, .invalidDefaultCurrency("US1"))
+        }
+        XCTAssertTrue(client.calls.isEmpty)
+    }
+
+    func testTransformedCurrencyIsValidatedInBothGroupingModes() throws {
+        for grouping: BrazeDestination.Options.PurchaseGrouping in [.perOrder, .perProduct(identifier: .sku)] {
+            var currency = " zzz "
+            let destination = makeDestination(.init(purchaseGrouping: grouping, transformPurchase: { purchase, _ in
+                var purchase = purchase
+                purchase.currency = currency
+                return purchase
+            }))
+            let event = TrackEvent(event: "Order Completed", properties: try JSON(["currency": "USD", "products": [["sku": "SKU1"]]]))
+            client.calls.removeAll()
+            try destination.forwardTrack(event, to: client)
+            guard case .purchase(_, let sentCurrency, _, _, _)? = client.calls.first else {
+                return XCTFail("Expected a purchase")
+            }
+            XCTAssertEqual(sentCurrency, "ZZZ")
+            currency = "US1"
+            XCTAssertThrowsError(try destination.forwardTrack(event, to: client)) {
+                XCTAssertEqual($0 as? BrazeDestinationError, .invalidCurrency("US1"))
+            }
+            XCTAssertEqual(client.calls.count, 1)
+        }
+    }
+
+    func testQueuedCurrencyErrorReachesErrorHandlerAndDoesNotStopReplay() {
+        var errors = [BrazeDestinationError]()
+        let analytics = Analytics(configuration: Configuration(writeKey: "braze-currency-\(UUID().uuidString)").errorHandler { error in
+            if case AnalyticsError.pluginError(let error) = error, let error = error as? BrazeDestinationError {
+                errors.append(error)
+            }
+        })
+        let destination = makeDestination(start: false)
+        destination.analytics = analytics
+        track(destination, "Order Completed", ["currency": "US1"])
+        track(destination, "Next event")
+        XCTAssertTrue(errors.isEmpty)
+        destination.start(client: client)
+        XCTAssertEqual(errors, [.invalidCurrency("US1")])
+        XCTAssertEqual(client.calls, [.customEvent("Next event", nil)])
+        withExtendedLifetime(analytics) {}
+    }
+
     func testPurchaseProductIdentifierName() {
-        let destination = makeDestination(.init(purchaseGrouping: .perProduct(identifier: .name)))
+        let destination = makeDestination(.init(purchaseGrouping: .perProduct(identifier: .name), defaultCurrency: "USD"))
         track(destination, "Completed Order", ["products": [["sku": "SKU1", "name": "Shirt", "price": 10], ["sku": "SKU2"]]])
         XCTAssertEqual(client.calls, [.purchase("Shirt", "USD", 10, 1, ["sku": "SKU1", "name": "Shirt"])])
     }
 
     func testOrderCompletedWithoutProducts() {
-        let destination = makeDestination()
+        let destination = makeDestination(.init(defaultCurrency: "USD"))
         track(destination, "Order Completed", ["total": 12, "currency": "dollars", "products": []])
         XCTAssertEqual(client.calls, [.purchase("Order Completed", "USD", 12, 1, ["total": 12, "currency": "dollars", "products": [Any]()])])
     }
@@ -258,7 +350,7 @@ final class BrazeDestination_Tests: XCTestCase {
 
     func testTransformPurchase() {
         var contexts = [PurchaseContext]()
-        let destination = makeDestination(.init(transformPurchase: { purchase, context in
+        let destination = makeDestination(.init(defaultCurrency: "USD", transformPurchase: { purchase, context in
             contexts.append(context)
             guard context.product?["sku"] as? String != "SKIP" else { return nil }
             var purchase = purchase
@@ -283,7 +375,7 @@ final class BrazeDestination_Tests: XCTestCase {
 
     func testTransformPurchaseInPerOrderMode() {
         var product: [String: Any]? = ["unset": true]
-        let destination = makeDestination(.init(purchaseGrouping: .perOrder, transformPurchase: { purchase, context in
+        let destination = makeDestination(.init(purchaseGrouping: .perOrder, defaultCurrency: "USD", transformPurchase: { purchase, context in
             product = context.product
             return purchase
         }))
@@ -296,7 +388,7 @@ final class BrazeDestination_Tests: XCTestCase {
         for isPerProduct in [true, false] {
             let grouping: BrazeDestination.Options.PurchaseGrouping = isPerProduct ? .perProduct(identifier: .sku) : .perOrder
             client.calls.removeAll()
-            let destination = makeDestination(.init(purchaseGrouping: grouping, transformPurchase: { purchase, context in
+            let destination = makeDestination(.init(purchaseGrouping: grouping, defaultCurrency: "USD", transformPurchase: { purchase, context in
                 let products = context.order["products"] as! [[String: Any]]
                 let product = context.product ?? products[0]
                 let details = product["details"] as! [String: Any]
@@ -326,7 +418,7 @@ final class BrazeDestination_Tests: XCTestCase {
     }
 
     func testTransformPurchaseCanSetMissingProductId() {
-        let destination = makeDestination(.init(transformPurchase: { purchase, context in
+        let destination = makeDestination(.init(defaultCurrency: "USD", transformPurchase: { purchase, context in
             var purchase = purchase
             if purchase.productId.isEmpty {
                 purchase.productId = context.product?["id"] as? String ?? ""
@@ -338,7 +430,7 @@ final class BrazeDestination_Tests: XCTestCase {
     }
 
     func testTransformPurchaseWithEmptyProductIdIsSkipped() {
-        let destination = makeDestination(.init(transformPurchase: { purchase, _ in
+        let destination = makeDestination(.init(defaultCurrency: "USD", transformPurchase: { purchase, _ in
             var purchase = purchase
             purchase.productId = ""
             return purchase
@@ -348,7 +440,7 @@ final class BrazeDestination_Tests: XCTestCase {
     }
 
     func testDefaultPurchaseEventNames() {
-        let destination = makeDestination()
+        let destination = makeDestination(.init(defaultCurrency: "USD"))
         track(destination, "Order Completed")
         track(destination, "Completed Order")
         track(destination, "order completed")
@@ -360,7 +452,7 @@ final class BrazeDestination_Tests: XCTestCase {
     }
 
     func testCustomPurchaseEventNames() {
-        let destination = makeDestination(.init(purchaseDetection: .eventNames(["Membership Purchased"])))
+        let destination = makeDestination(.init(purchaseDetection: .eventNames(["Membership Purchased"]), defaultCurrency: "USD"))
         track(destination, "Membership Purchased", ["revenue": 20])
         track(destination, "Order Completed")
         XCTAssertEqual(client.calls, [
@@ -370,7 +462,7 @@ final class BrazeDestination_Tests: XCTestCase {
     }
 
     func testCustomPurchaseDetection() {
-        let destination = makeDestination(.init(purchaseDetection: .matcher { $0.event == "Membership Purchased" }))
+        let destination = makeDestination(.init(purchaseDetection: .matcher { $0.event == "Membership Purchased" }, defaultCurrency: "USD"))
         track(destination, "Membership Purchased")
         track(destination, "Order Completed")
         XCTAssertEqual(client.calls, [
@@ -453,7 +545,7 @@ final class BrazeDestination_Tests: XCTestCase {
             // Bound the wait so a regression fails instead of hanging the test process.
             XCTAssertEqual(concurrentTrackReturned.wait(timeout: .now() + 2), .success)
         }
-        var options = BrazeDestination.Options()
+        var options = BrazeDestination.Options(defaultCurrency: "USD")
         if transform {
             options.transformPurchase = { purchase, _ in
                 callback()

@@ -126,7 +126,7 @@ extension BrazeDestination {
 
     // MARK: - Track and screen
 
-    func forwardTrack(_ event: TrackEvent, to client: BrazeClient) {
+    func forwardTrack(_ event: TrackEvent, to client: BrazeClient) throws {
         let name = event.event
         guard !name.isEmpty else {
             log("Dropped track call with an empty event name.")
@@ -148,7 +148,7 @@ extension BrazeDestination {
         case .matcher(let isPurchaseEvent): isPurchase = isPurchaseEvent(event)
         }
         if isPurchase {
-            logPurchases(event, properties: properties, to: client)
+            try logPurchases(event, properties: properties, to: client)
         } else {
             client.logCustomEvent(name: name, properties: eventProperties(properties).nonEmpty)
         }
@@ -163,11 +163,8 @@ extension BrazeDestination {
         client.logCustomEvent(name: name, properties: eventProperties(properties).nonEmpty)
     }
 
-    private func logPurchases(_ event: TrackEvent, properties: [String: JSON], to client: BrazeClient) {
-        var currency = "USD"
-        if case .string(let value)? = properties["currency"], value.count == 3 {
-            currency = value
-        }
+    private func logPurchases(_ event: TrackEvent, properties: [String: JSON], to client: BrazeClient) throws {
+        let currency = try purchaseCurrency(properties["currency"]?.stringValue)
         let order = eventProperties(properties)
         var products = [[String: JSON]]()
         if case .array(let items)? = properties["products"] {
@@ -180,7 +177,7 @@ extension BrazeDestination {
         guard case .perProduct(let identifier) = options.purchaseGrouping, !products.isEmpty else {
             let total = (Self.decimal(properties["revenue"]) ?? Self.decimal(properties["total"])).map(Self.double) ?? 0
             let purchase = BrazePurchase(productId: event.event, price: total, currency: currency, quantity: 1, properties: eventProperties(properties))
-            logPurchase(purchase, context: PurchaseContext(event: event, order: order, product: nil), to: client)
+            try logPurchase(purchase, context: PurchaseContext(event: event, order: order, product: nil), to: client)
             return
         }
 
@@ -193,11 +190,11 @@ extension BrazeDestination {
             let price = Self.decimal(product["price"]).map(Self.double) ?? 0
             let quantity = product["quantity"]?.intValue ?? 1
             let purchase = BrazePurchase(productId: productId, price: price, currency: currency, quantity: quantity, properties: eventProperties(fields))
-            logPurchase(purchase, context: PurchaseContext(event: event, order: order, product: eventProperties(product)), to: client)
+            try logPurchase(purchase, context: PurchaseContext(event: event, order: order, product: eventProperties(product)), to: client)
         }
     }
 
-    private func logPurchase(_ purchase: BrazePurchase, context: PurchaseContext, to client: BrazeClient) {
+    private func logPurchase(_ purchase: BrazePurchase, context: PurchaseContext, to client: BrazeClient) throws {
         var purchase = purchase
         if let transformPurchase = options.transformPurchase {
             guard let transformed = transformPurchase(purchase, context) else { return }
@@ -207,7 +204,24 @@ extension BrazeDestination {
             log("Dropped a purchase from \(context.event.event) with an empty productId.")
             return
         }
+        purchase.currency = try purchaseCurrency(purchase.currency)
         client.logPurchase(productId: purchase.productId, currency: purchase.currency, price: purchase.price, quantity: purchase.quantity, properties: purchase.properties.nonEmpty)
+    }
+
+    private func purchaseCurrency(_ value: String?) throws -> String {
+        func normalize(_ value: String?) -> String? {
+            guard let code = value?.trimmingCharacters(in: .whitespacesAndNewlines).uppercased(),
+                  code.utf8.count == 3, code.utf8.allSatisfy({ (65...90).contains($0) }) else { return nil }
+            return code
+        }
+        if let currency = normalize(value) { return currency }
+        guard let fallback = options.defaultCurrency else {
+            throw BrazeDestinationError.invalidCurrency(value)
+        }
+        guard let currency = normalize(fallback) else {
+            throw BrazeDestinationError.invalidDefaultCurrency(fallback)
+        }
+        return currency
     }
 
     // MARK: - Values
