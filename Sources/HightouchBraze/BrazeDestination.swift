@@ -69,10 +69,10 @@ public final class BrazeDestination: DestinationPlugin {
 
     let options: Options
     private let userDefaults: UserDefaults
-    // Recursive so an event tracked re-entrantly from inside a Braze call can't deadlock the host app.
-    private let lock = NSRecursiveLock()
+    private let lock = NSLock()
     private var client: BrazeClient?
     private var pending = [(BrazeClient) -> Void]()
+    private var isDraining = false
     private var readyCallbacks = [(BrazeClient) -> Void]()
     private(set) var userState: UserState
 
@@ -159,13 +159,9 @@ extension BrazeDestination {
     func start(client: BrazeClient) {
         lock.lock()
         self.client = client
-        let replay = pending
-        pending.removeAll()
-        replay.forEach { $0(client) }
-        let callbacks = readyCallbacks
+        pending.append(contentsOf: readyCallbacks)
         readyCallbacks.removeAll()
-        lock.unlock()
-        callbacks.forEach { $0(client) }
+        drain()
     }
 
     func onClientReady(_ callback: @escaping (BrazeClient) -> Void) {
@@ -179,18 +175,33 @@ extension BrazeDestination {
         callback(client)
     }
 
-    // Everything runs under the lock so Braze calls and the attribute cache stay in event order across threads.
     private func perform(_ work: @escaping (BrazeClient) -> Void) {
         lock.lock()
-        defer { lock.unlock() }
-        guard let client = client else {
-            if pending.count >= Self.maxPendingCount {
-                pending.removeFirst()
-            }
-            pending.append(work)
+        if client == nil && pending.count >= Self.maxPendingCount {
+            pending.removeFirst()
+        }
+        pending.append(work)
+        drain()
+    }
+
+    // Called with the lock held; always releases it. Only one caller drains Braze calls and
+    // cache updates, so concurrent/reentrant calls can enqueue and return without reordering events.
+    private func drain() {
+        guard !isDraining, client != nil else {
+            lock.unlock()
             return
         }
-        work(client)
+        isDraining = true
+        while let client = client, !pending.isEmpty {
+            let work = pending
+            pending.removeAll()
+            lock.unlock()
+            // Customer callbacks may synchronously wait for another thread that calls analytics.
+            work.forEach { $0(client) }
+            lock.lock()
+        }
+        isDraining = false
+        lock.unlock()
     }
 
     private func isEnabled(for event: RawEvent) -> Bool {

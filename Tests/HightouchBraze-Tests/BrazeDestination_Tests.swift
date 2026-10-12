@@ -412,6 +412,96 @@ final class BrazeDestination_Tests: XCTestCase {
 
     // MARK: - Readiness
 
+    func testPurchaseMatcherCanWaitForConcurrentTrack() {
+        assertPurchaseCallbackCanWaitForConcurrentTrack(transform: false, replay: false)
+    }
+
+    func testPurchaseTransformerCanWaitForConcurrentTrack() {
+        assertPurchaseCallbackCanWaitForConcurrentTrack(transform: true, replay: false)
+    }
+
+    func testQueuedPurchaseMatcherCanWaitForConcurrentTrack() {
+        assertPurchaseCallbackCanWaitForConcurrentTrack(transform: false, replay: true)
+    }
+
+    func testQueuedPurchaseTransformerCanWaitForConcurrentTrack() {
+        assertPurchaseCallbackCanWaitForConcurrentTrack(transform: true, replay: true)
+    }
+
+    private func assertPurchaseCallbackCanWaitForConcurrentTrack(transform: Bool, replay: Bool) {
+        let entered = DispatchSemaphore(value: 0)
+        let concurrentTrackReturned = DispatchSemaphore(value: 0)
+        let drained = expectation(description: "Braze operations drained")
+        let callback = {
+            entered.signal()
+            // Bound the wait so a regression fails instead of hanging the test process.
+            XCTAssertEqual(concurrentTrackReturned.wait(timeout: .now() + 2), .success)
+        }
+        var options = BrazeDestination.Options()
+        if transform {
+            options.transformPurchase = { purchase, _ in
+                callback()
+                return purchase
+            }
+        } else {
+            options.purchaseDetection = .matcher { event in
+                guard event.event == "Order Completed" else { return false }
+                callback()
+                return true
+            }
+        }
+        let destination = makeDestination(options, start: !replay)
+        let client = self.client!
+        if replay {
+            track(destination, "Order Completed")
+            track(destination, "Already queued")
+        }
+        DispatchQueue.global().async {
+            if replay {
+                destination.start(client: client)
+            } else {
+                self.track(destination, "Order Completed")
+            }
+            drained.fulfill()
+        }
+        XCTAssertEqual(entered.wait(timeout: .now() + 2), .success)
+        identify(destination, userId: "u2")
+        track(destination, "Concurrent")
+        concurrentTrackReturned.signal()
+        wait(for: [drained], timeout: 5)
+
+        var expected: [FakeBrazeClient.Call] = [.purchase("Order Completed", "USD", 0, 1, nil)]
+        if replay { expected.append(.customEvent("Already queued", nil)) }
+        expected += [.changeUser("u2"), .customEvent("Concurrent", nil)]
+        XCTAssertEqual(client.calls, expected)
+    }
+
+    func testReentrantOperationsFollowQueuedEvents() {
+        var onTrack: (() -> Void)?
+        let destination = makeDestination(.init(purchaseDetection: .matcher { event in
+            if event.event == "Outer" { onTrack?() }
+            return false
+        }), start: false)
+        onTrack = { [unowned destination] in
+            self.track(destination, "Nested")
+            destination.reset()
+            self.identify(destination, userId: "u1", ["plan": "pro"])
+            destination.flush()
+        }
+        identify(destination, userId: "u1", ["plan": "pro"])
+        track(destination, "Outer")
+        track(destination, "Already queued")
+        destination.start(client: client)
+
+        XCTAssertEqual(client.calls, [
+            .changeUser("u1"), .update(.customAttribute("plan", .string("pro"))),
+            .customEvent("Outer", nil), .customEvent("Already queued", nil),
+            .customEvent("Nested", nil),
+            .changeUser("u1"), .update(.customAttribute("plan", .string("pro"))),
+            .flush,
+        ])
+    }
+
     func testEventsQueueUntilBrazeIsReady() {
         let destination = makeDestination(start: false)
         var readyCount = 0
