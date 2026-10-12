@@ -175,8 +175,9 @@ extension BrazeDestination {
         }
 
         guard case .perProduct(let identifier) = options.purchaseGrouping, !products.isEmpty else {
-            let total = (Self.decimal(properties["revenue"]) ?? Self.decimal(properties["total"])).map(Self.double) ?? 0
-            let purchase = BrazePurchase(productId: event.event, price: total, currency: currency, quantity: 1, properties: eventProperties(properties))
+            let total = try Self.purchaseNumber(properties["revenue"] ?? properties["total"], quantity: false)
+            let quantity = try Self.purchaseNumber(properties["quantity"] ?? .number(1), quantity: true)
+            let purchase = BrazePurchase(productId: event.event, price: total, currency: currency, quantity: Int(quantity), properties: eventProperties(properties))
             try logPurchase(purchase, context: PurchaseContext(event: event, order: order, product: nil), to: client)
             return
         }
@@ -187,9 +188,9 @@ extension BrazeDestination {
         for product in products {
             let productId = idKeys.lazy.compactMap({ product[$0].flatMap(Self.scalarString) }).first(where: { !$0.isEmpty }) ?? ""
             let fields = orderFields.merging(product.filter { $0.key != "price" && $0.key != "quantity" }) { $1 }
-            let price = Self.decimal(product["price"]).map(Self.double) ?? 0
-            let quantity = product["quantity"]?.intValue ?? 1
-            let purchase = BrazePurchase(productId: productId, price: price, currency: currency, quantity: quantity, properties: eventProperties(fields))
+            let price = try Self.purchaseNumber(product["price"], quantity: false)
+            let quantity = try Self.purchaseNumber(product["quantity"] ?? .number(1), quantity: true)
+            let purchase = BrazePurchase(productId: productId, price: price, currency: currency, quantity: Int(quantity), properties: eventProperties(fields))
             try logPurchase(purchase, context: PurchaseContext(event: event, order: order, product: eventProperties(product)), to: client)
         }
     }
@@ -205,7 +206,26 @@ extension BrazeDestination {
             return
         }
         purchase.currency = try purchaseCurrency(purchase.currency)
+        guard purchase.price.isFinite else { throw BrazeDestinationError.invalidPrice }
+        guard (1...100).contains(purchase.quantity) else { throw BrazeDestinationError.invalidQuantity }
         client.logPurchase(productId: purchase.productId, currency: purchase.currency, price: purchase.price, quantity: purchase.quantity, properties: purchase.properties.nonEmpty)
+    }
+
+    static func purchaseNumber(_ value: JSON?, quantity: Bool) throws -> Double {
+        let number: Double?
+        switch value {
+        case .number(let value)?: number = double(value)
+        case .string(let value)?:
+            let text = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            let pattern = "^[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?$"
+            number = text.range(of: pattern, options: .regularExpression) == nil ? nil : Double(text)
+        default: number = nil
+        }
+        guard let number = number, number.isFinite,
+              !quantity || (number.rounded() == number && (1...100).contains(number)) else {
+            throw quantity ? BrazeDestinationError.invalidQuantity : BrazeDestinationError.invalidPrice
+        }
+        return number
     }
 
     private func purchaseCurrency(_ value: String?) throws -> String {
@@ -260,14 +280,6 @@ extension BrazeDestination {
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
         return (try? encoder.encode(value)).flatMap { String(data: $0, encoding: .utf8) } ?? ""
-    }
-
-    static func decimal(_ value: JSON?) -> Decimal? {
-        switch value {
-        case .number(let number)?: return number
-        case .string(let string)?: return Decimal(string: string, locale: Locale(identifier: "en_US_POSIX"))
-        default: return nil
-        }
     }
 
     static func double(_ value: Decimal) -> Double {

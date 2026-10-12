@@ -27,6 +27,9 @@ public final class BrazeDestination: DestinationPlugin {
             case matcher((TrackEvent) -> Bool)
         }
 
+        /// Products require a finite price. Omitted quantities default to 1; supplied quantities must be integers from 1 to 100.
+        /// Whole-order purchases require revenue (or total if revenue is absent); quantity also defaults to 1.
+        /// Complete numeric strings and an explicit zero price are accepted.
         public enum PurchaseGrouping {
             /// One purchase per product. An event without products is logged as one purchase with the event name as its product ID.
             case perProduct(identifier: PurchaseProductIdentifier)
@@ -137,6 +140,8 @@ public final class BrazeDestination: DestinationPlugin {
 public enum BrazeDestinationError: Error, LocalizedError, Equatable {
     case invalidCurrency(String?)
     case invalidDefaultCurrency(String)
+    case invalidPrice
+    case invalidQuantity
 
     public var errorDescription: String? {
         switch self {
@@ -144,6 +149,10 @@ public enum BrazeDestinationError: Error, LocalizedError, Equatable {
             return "Braze purchase rejected: invalid or missing currency (\(value ?? "nil")). Send a three-letter currency code or configure defaultCurrency."
         case .invalidDefaultCurrency(let value):
             return "Braze purchase rejected: defaultCurrency (\(value)) must be a three-letter currency code."
+        case .invalidPrice:
+            return "Braze purchase rejected: price must be explicitly supplied as a finite number."
+        case .invalidQuantity:
+            return "Braze purchase rejected: quantity must be an integer from 1 to 100."
         }
     }
 }

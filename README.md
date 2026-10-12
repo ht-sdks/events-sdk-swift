@@ -41,6 +41,13 @@ rejected and reported to `Configuration.errorHandler` as
 `AnalyticsError.pluginError(BrazeDestinationError)`; `track` itself is nonthrowing.
 The same validation applies to currencies returned by `transformPurchase`.
 
+Each product must also supply a finite `price`. Whole-order purchases (including
+events without products) require `revenue` (or `total` if revenue is absent).
+Omitted quantities default to `1` in both modes; supplied quantities must be
+integers from 1 to 100. Complete numeric strings and an explicitly supplied zero
+price are accepted. Missing prices and invalid values are rejected through the
+same error handler. Prices and quantities returned by `transformPurchase` are also validated.
+
 The adapter supports iOS, tvOS, Mac Catalyst, and visionOS. BrazeKit is linked only
 by the `HightouchBraze` target on those platforms; SwiftPM may still resolve and
 download Braze dependencies for consumers of other products. Apps choose whether

@@ -220,9 +220,9 @@ final class BrazeDestination_Tests: XCTestCase {
             "coupon": "ORDER",
             "products": [
                 ["sku": "SKU1", "product_id": "p1", "name": "Shirt", "price": 10, "quantity": 2, "coupon": "C1", "$color": "red"],
-                ["product_id": "p2", "name": "Hat", "price": "5.5"],
-                ["name": "Scarf"],
-                ["price": 1],
+                ["product_id": "p2", "name": "Hat", "price": "5.5", "quantity": 1],
+                ["name": "Scarf", "price": 0, "quantity": 1],
+                ["price": 1, "quantity": 1],
             ],
         ])
         XCTAssertEqual(client.calls, [
@@ -235,12 +235,77 @@ final class BrazeDestination_Tests: XCTestCase {
         ])
     }
 
+    func testPriceIsRequiredAndSuppliedQuantityIsValidatedInBothGroupingModes() throws {
+        let invalid: [Any?] = [nil, NSNull(), true, "", " ", "12oops", "NaN", "Infinity", "1e309", "0x10"]
+        for grouping: BrazeDestination.Options.PurchaseGrouping in [.perOrder, .perProduct(identifier: .sku)] {
+            let destination = makeDestination(.init(purchaseGrouping: grouping))
+            for quantity in [false, true] {
+                for value in invalid + (quantity ? [0, -1, 1.5, 101] : []) {
+                    if quantity, value == nil { continue }
+                    var product: [String: Any] = ["sku": "SKU1", "price": 2, "quantity": 1]
+                    product[quantity ? "quantity" : "price"] = value
+                    var order: [String: Any] = ["currency": "USD", "products": [product], "revenue": 2, "quantity": 1]
+                    order[quantity ? "quantity" : "revenue"] = value
+                    if !quantity, value != nil { order["total"] = 99 }
+                    XCTAssertThrowsError(try destination.forwardTrack(TrackEvent(event: "Order Completed", properties: try JSON(order)), to: client)) {
+                        XCTAssertEqual($0 as? BrazeDestinationError, quantity ? .invalidQuantity : .invalidPrice)
+                    }
+                }
+            }
+        }
+        XCTAssertTrue(client.calls.isEmpty)
+    }
+
+    func testOmittedQuantityDefaultsToOneInBothGroupingModes() {
+        for grouping: BrazeDestination.Options.PurchaseGrouping in [.perOrder, .perProduct(identifier: .sku)] {
+            let destination = makeDestination(.init(purchaseGrouping: grouping, transformPurchase: { purchase, _ in
+                XCTAssertEqual(purchase.quantity, 1)
+                return purchase
+            }))
+            for products: [[String: Any]] in [[], [["sku": "SKU1", "price": 2]]] {
+                client.calls.removeAll()
+                track(destination, "Order Completed", ["currency": "USD", "revenue": 2, "products": products])
+                guard case .purchase(_, _, let price, let quantity, _)? = client.calls.first else {
+                    return XCTFail("Expected a purchase")
+                }
+                XCTAssertEqual(price, 2)
+                XCTAssertEqual(quantity, 1)
+                XCTAssertEqual(client.calls.count, 1)
+            }
+        }
+    }
+
+    func testExplicitZeroAndNumericStringsAreAccepted() throws {
+        let destination = makeDestination()
+        track(destination, "Order Completed", ["currency": "USD", "revenue": 0, "total": 99, "quantity": "2"])
+        track(destination, "Order Completed", ["currency": "USD", "products": [["sku": "SKU1", "price": " 2.5e1 ", "quantity": "3"]]])
+        XCTAssertEqual(client.calls, [
+            .purchase("Order Completed", "USD", 0, 2, ["currency": "USD", "revenue": 0, "total": 99, "quantity": "2"]),
+            .purchase("SKU1", "USD", 25, 3, ["currency": "USD", "sku": "SKU1"]),
+        ])
+    }
+
+    func testTransformedPurchaseNumbersAreValidated() throws {
+        for quantity in [false, true] {
+            let destination = makeDestination(.init(transformPurchase: { purchase, _ in
+                var purchase = purchase
+                if quantity { purchase.quantity = 0 } else { purchase.price = .infinity }
+                return purchase
+            }))
+            let event = TrackEvent(event: "Order Completed", properties: try JSON(["currency": "USD", "revenue": 2, "quantity": 1]))
+            XCTAssertThrowsError(try destination.forwardTrack(event, to: client)) {
+                XCTAssertEqual($0 as? BrazeDestinationError, quantity ? .invalidQuantity : .invalidPrice)
+            }
+        }
+        XCTAssertTrue(client.calls.isEmpty)
+    }
+
     func testPurchaseCurrencyNormalization() {
         let destination = makeDestination()
         for (input, expected) in [(" eur\n", "EUR"), ("uSd", "USD"), ("btc", "BTC"), (" zzz ", "ZZZ")] {
             client.calls.removeAll()
-            track(destination, "Order Completed", ["currency": input, "total": 12])
-            XCTAssertEqual(client.calls, [.purchase("Order Completed", expected, 12, 1, ["currency": input, "total": 12])])
+            track(destination, "Order Completed", ["currency": input, "quantity": 1, "total": 12])
+            XCTAssertEqual(client.calls, [.purchase("Order Completed", expected, 12, 1, ["currency": input, "quantity": 1, "total": 12])])
         }
     }
 
@@ -258,13 +323,13 @@ final class BrazeDestination_Tests: XCTestCase {
 
     func testExplicitDefaultCurrencyIsNormalizedAndOnlyUsedWhenNeeded() {
         let destination = makeDestination(.init(defaultCurrency: " gbp\n"))
-        track(destination, "Order Completed")
-        track(destination, "Order Completed", ["currency": "US1"])
-        track(destination, "Order Completed", ["currency": "eur"])
+        track(destination, "Order Completed", ["revenue": 0, "quantity": 1])
+        track(destination, "Order Completed", ["currency": "US1", "revenue": 0, "quantity": 1])
+        track(destination, "Order Completed", ["currency": "eur", "revenue": 0, "quantity": 1])
         XCTAssertEqual(client.calls, [
-            .purchase("Order Completed", "GBP", 0, 1, nil),
-            .purchase("Order Completed", "GBP", 0, 1, ["currency": "US1"]),
-            .purchase("Order Completed", "EUR", 0, 1, ["currency": "eur"]),
+            .purchase("Order Completed", "GBP", 0, 1, ["revenue": 0, "quantity": 1]),
+            .purchase("Order Completed", "GBP", 0, 1, ["currency": "US1", "revenue": 0, "quantity": 1]),
+            .purchase("Order Completed", "EUR", 0, 1, ["currency": "eur", "revenue": 0, "quantity": 1]),
         ])
     }
 
@@ -294,7 +359,7 @@ final class BrazeDestination_Tests: XCTestCase {
                 purchase.currency = currency
                 return purchase
             }))
-            let event = TrackEvent(event: "Order Completed", properties: try JSON(["currency": "USD", "products": [["sku": "SKU1"]]]))
+            let event = TrackEvent(event: "Order Completed", properties: try JSON(["currency": "USD", "revenue": 0, "quantity": 1, "products": [["sku": "SKU1", "price": 0, "quantity": 1]]]))
             client.calls.removeAll()
             try destination.forwardTrack(event, to: client)
             guard case .purchase(_, let sentCurrency, _, _, _)? = client.calls.first else {
@@ -318,7 +383,7 @@ final class BrazeDestination_Tests: XCTestCase {
         })
         let destination = makeDestination(start: false)
         destination.analytics = analytics
-        track(destination, "Order Completed", ["currency": "US1"])
+        track(destination, "Order Completed", ["currency": "US1", "revenue": 0, "quantity": 1])
         track(destination, "Next event")
         XCTAssertTrue(errors.isEmpty)
         destination.start(client: client)
@@ -329,22 +394,22 @@ final class BrazeDestination_Tests: XCTestCase {
 
     func testPurchaseProductIdentifierName() {
         let destination = makeDestination(.init(purchaseGrouping: .perProduct(identifier: .name), defaultCurrency: "USD"))
-        track(destination, "Completed Order", ["products": [["sku": "SKU1", "name": "Shirt", "price": 10], ["sku": "SKU2"]]])
+        track(destination, "Completed Order", ["products": [["sku": "SKU1", "name": "Shirt", "price": 10, "quantity": 1], ["sku": "SKU2", "price": 0, "quantity": 1]]])
         XCTAssertEqual(client.calls, [.purchase("Shirt", "USD", 10, 1, ["sku": "SKU1", "name": "Shirt"])])
     }
 
     func testOrderCompletedWithoutProducts() {
         let destination = makeDestination(.init(defaultCurrency: "USD"))
-        track(destination, "Order Completed", ["total": 12, "currency": "dollars", "products": []])
-        XCTAssertEqual(client.calls, [.purchase("Order Completed", "USD", 12, 1, ["total": 12, "currency": "dollars", "products": [Any]()])])
+        track(destination, "Order Completed", ["quantity": 1, "total": 12, "currency": "dollars", "products": []])
+        XCTAssertEqual(client.calls, [.purchase("Order Completed", "USD", 12, 1, ["quantity": 1, "total": 12, "currency": "dollars", "products": [Any]()])])
     }
 
     func testPerOrderPurchases() {
         let destination = makeDestination(.init(purchaseGrouping: .perOrder))
         let products: [[String: Any]] = [["sku": "SKU1", "name": "Shirt", "price": 10, "quantity": 2, "coupon": "C1"]]
-        track(destination, "Order Completed", ["order_id": "o1", "revenue": 25, "currency": "EUR", "products": products])
+        track(destination, "Order Completed", ["order_id": "o1", "revenue": 25, "quantity": 1, "currency": "EUR", "products": products])
         XCTAssertEqual(client.calls, [
-            .purchase("Order Completed", "EUR", 25, 1, ["order_id": "o1", "revenue": 25, "currency": "EUR", "products": products]),
+            .purchase("Order Completed", "EUR", 25, 1, ["order_id": "o1", "revenue": 25, "quantity": 1, "currency": "EUR", "products": products]),
         ])
     }
 
@@ -361,14 +426,14 @@ final class BrazeDestination_Tests: XCTestCase {
             purchase.properties = ["Transaction Id": context.order["order_id"] ?? ""]
             return purchase
         }))
-        track(destination, "Order Completed", ["order_id": "o1", "products": [["sku": "SKU1", "price": 5], ["sku": "SKIP"]]])
-        track(destination, "Order Completed", ["order_id": "o2", "revenue": 4])
+        track(destination, "Order Completed", ["order_id": "o1", "products": [["sku": "SKU1", "price": 5, "quantity": 1], ["sku": "SKIP", "price": 0, "quantity": 1]]])
+        track(destination, "Order Completed", ["order_id": "o2", "revenue": 4, "quantity": 1])
         XCTAssertEqual(client.calls, [
             .purchase("x-SKU1", "EUR", 10, 3, ["Transaction Id": "o1"]),
             .purchase("x-Order Completed", "EUR", 8, 3, ["Transaction Id": "o2"]),
         ])
         XCTAssertEqual(contexts.map { $0.event.event }, ["Order Completed", "Order Completed", "Order Completed"])
-        XCTAssertEqual(contexts[0].product as NSDictionary?, ["sku": "SKU1", "price": 5])
+        XCTAssertEqual(contexts[0].product as NSDictionary?, ["sku": "SKU1", "price": 5, "quantity": 1])
         XCTAssertEqual(contexts[0].order["order_id"] as? String, "o1")
         XCTAssertNil(contexts[2].product)
     }
@@ -379,9 +444,9 @@ final class BrazeDestination_Tests: XCTestCase {
             product = context.product
             return purchase
         }))
-        track(destination, "Order Completed", ["products": [["sku": "SKU1"]]])
+        track(destination, "Order Completed", ["revenue": 0, "quantity": 1, "products": [["sku": "SKU1", "price": 0, "quantity": 1]]])
         XCTAssertNil(product)
-        XCTAssertEqual(client.calls, [.purchase("Order Completed", "USD", 0, 1, ["products": [["sku": "SKU1"]]])])
+        XCTAssertEqual(client.calls, [.purchase("Order Completed", "USD", 0, 1, ["revenue": 0, "quantity": 1, "products": [["sku": "SKU1", "price": 0, "quantity": 1]]])])
     }
 
     func testPurchaseContextContainsPlainValuesForCompatibilityTransforms() {
@@ -407,7 +472,7 @@ final class BrazeDestination_Tests: XCTestCase {
                 return purchase
             }))
             track(destination, "Order Completed", [
-                "channel": "app", "revenue": 30,
+                "channel": "app", "revenue": 30, "quantity": 1,
                 "products": [["sku": "RB-100", "name": "Resistance Band", "price": 15, "quantity": 2,
                               "details": ["color": "blue", "available": true, "sizes": [42]]]],
             ])
@@ -425,7 +490,7 @@ final class BrazeDestination_Tests: XCTestCase {
             }
             return purchase
         }))
-        track(destination, "Order Completed", ["products": [["id": "custom-1", "price": 3]]])
+        track(destination, "Order Completed", ["products": [["id": "custom-1", "price": 3, "quantity": 1]]])
         XCTAssertEqual(client.calls, [.purchase("custom-1", "USD", 3, 1, ["id": "custom-1"])])
     }
 
@@ -435,38 +500,38 @@ final class BrazeDestination_Tests: XCTestCase {
             purchase.productId = ""
             return purchase
         }))
-        track(destination, "Order Completed", ["products": [["sku": "SKU1"]]])
+        track(destination, "Order Completed", ["products": [["sku": "SKU1", "price": 0, "quantity": 1]]])
         XCTAssertEqual(client.calls, [])
     }
 
     func testDefaultPurchaseEventNames() {
         let destination = makeDestination(.init(defaultCurrency: "USD"))
-        track(destination, "Order Completed")
-        track(destination, "Completed Order")
+        track(destination, "Order Completed", ["revenue": 0, "quantity": 1])
+        track(destination, "Completed Order", ["revenue": 0, "quantity": 1])
         track(destination, "order completed")
         XCTAssertEqual(client.calls, [
-            .purchase("Order Completed", "USD", 0, 1, nil),
-            .purchase("Completed Order", "USD", 0, 1, nil),
+            .purchase("Order Completed", "USD", 0, 1, ["revenue": 0, "quantity": 1]),
+            .purchase("Completed Order", "USD", 0, 1, ["revenue": 0, "quantity": 1]),
             .customEvent("order completed", nil),
         ])
     }
 
     func testCustomPurchaseEventNames() {
         let destination = makeDestination(.init(purchaseDetection: .eventNames(["Membership Purchased"]), defaultCurrency: "USD"))
-        track(destination, "Membership Purchased", ["revenue": 20])
+        track(destination, "Membership Purchased", ["revenue": 20, "quantity": 1])
         track(destination, "Order Completed")
         XCTAssertEqual(client.calls, [
-            .purchase("Membership Purchased", "USD", 20, 1, ["revenue": 20]),
+            .purchase("Membership Purchased", "USD", 20, 1, ["revenue": 20, "quantity": 1]),
             .customEvent("Order Completed", nil),
         ])
     }
 
     func testCustomPurchaseDetection() {
         let destination = makeDestination(.init(purchaseDetection: .matcher { $0.event == "Membership Purchased" }, defaultCurrency: "USD"))
-        track(destination, "Membership Purchased")
+        track(destination, "Membership Purchased", ["revenue": 0, "quantity": 1])
         track(destination, "Order Completed")
         XCTAssertEqual(client.calls, [
-            .purchase("Membership Purchased", "USD", 0, 1, nil),
+            .purchase("Membership Purchased", "USD", 0, 1, ["revenue": 0, "quantity": 1]),
             .customEvent("Order Completed", nil),
         ])
     }
@@ -561,14 +626,14 @@ final class BrazeDestination_Tests: XCTestCase {
         let destination = makeDestination(options, start: !replay)
         let client = self.client!
         if replay {
-            track(destination, "Order Completed")
+            track(destination, "Order Completed", ["revenue": 0, "quantity": 1])
             track(destination, "Already queued")
         }
         DispatchQueue.global().async {
             if replay {
                 destination.start(client: client)
             } else {
-                self.track(destination, "Order Completed")
+                self.track(destination, "Order Completed", ["revenue": 0, "quantity": 1])
             }
             drained.fulfill()
         }
@@ -578,7 +643,7 @@ final class BrazeDestination_Tests: XCTestCase {
         concurrentTrackReturned.signal()
         wait(for: [drained], timeout: 5)
 
-        var expected: [FakeBrazeClient.Call] = [.purchase("Order Completed", "USD", 0, 1, nil)]
+        var expected: [FakeBrazeClient.Call] = [.purchase("Order Completed", "USD", 0, 1, ["revenue": 0, "quantity": 1])]
         if replay { expected.append(.customEvent("Already queued", nil)) }
         expected += [.changeUser("u2"), .customEvent("Concurrent", nil)]
         XCTAssertEqual(client.calls, expected)
