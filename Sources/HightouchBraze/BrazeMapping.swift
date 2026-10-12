@@ -107,7 +107,7 @@ extension BrazeDestination {
     }
 
     static func subscriptionState(from value: String) -> BrazeSubscriptionState? {
-        switch value {
+        switch value.trimmingCharacters(in: .whitespaces).lowercased() {
         case "opted_in": return .optedIn
         case "subscribed": return .subscribed
         case "unsubscribed": return .unsubscribed
