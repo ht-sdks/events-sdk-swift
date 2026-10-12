@@ -26,9 +26,16 @@ jobs:
   build_and_test_spm_linux:
     runs-on: ubuntu-latest
     steps:
+      - name: Import Swift 6 signing key
+        timeout-minutes: 1
+        run: |
+          gpg --batch --keyserver hkps://keyserver.ubuntu.com \
+            --recv-keys 52BB7E3DE28A71BE22EC05FFEF80A866B47A981F
       - uses: sersoft-gmbh/swifty-linux-action@577251f82ce4f38e1ae770530f0b64305502a5fa # v3.0.1
         with:
-          release-version: "5.10.1"
+          # release-version rejects this toolchain because swift --version reports 6.4, not 6.4.0.
+          branch-name: "swift-6.4.0-release"
+          version-tag: "swift-6.4.0-RELEASE"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Build
         run: swift build
