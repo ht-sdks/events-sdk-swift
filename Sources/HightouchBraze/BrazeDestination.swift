@@ -177,11 +177,15 @@ extension BrazeDestination {
 
     private func perform(_ work: @escaping (BrazeClient) -> Void) {
         lock.lock()
-        if client == nil && pending.count >= Self.maxPendingCount {
+        let overflow = client == nil && pending.count >= Self.maxPendingCount
+        if overflow {
             pending.removeFirst()
         }
         pending.append(work)
         drain()
+        if overflow {
+            log("Warning: pending queue reached \(Self.maxPendingCount) operations; dropped the oldest operation. Call setBraze(_:) to start forwarding queued events.")
+        }
     }
 
     // Called with the lock held; always releases it. Only one caller drains Braze calls and

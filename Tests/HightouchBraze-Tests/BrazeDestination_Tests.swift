@@ -412,6 +412,22 @@ final class BrazeDestination_Tests: XCTestCase {
 
     // MARK: - Readiness
 
+    func testPendingQueueDropsOldestOnOverflow() {
+        let destination = makeDestination(start: false)
+        for index in 0...BrazeDestination.maxPendingCount {
+            track(destination, "Event \(index)")
+        }
+        XCTAssertTrue(client.calls.isEmpty)
+
+        destination.start(client: client)
+
+        XCTAssertEqual(client.calls, (1...BrazeDestination.maxPendingCount).map {
+            .customEvent("Event \($0)", nil)
+        })
+        track(destination, "After startup")
+        XCTAssertEqual(client.calls.last, .customEvent("After startup", nil))
+    }
+
     func testPurchaseMatcherCanWaitForConcurrentTrack() {
         assertPurchaseCallbackCanWaitForConcurrentTrack(transform: false, replay: false)
     }
