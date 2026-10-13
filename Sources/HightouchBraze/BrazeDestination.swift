@@ -83,19 +83,18 @@ public final class BrazeDestination: DestinationPlugin {
     private var pending = [(BrazeClient) -> Void]()
     private var isDraining = false
     private var readyCallbacks = [(BrazeClient) -> Void]()
-    private(set) var userState: UserState
+    private var stateStorageKey: String?
+    private(set) var userState = UserState()
 
     /// Creates the destination without a Braze instance. Events are queued until you call `setBraze(_:)`.
     public init(options: Options = Options()) {
         self.options = options
         self.userDefaults = .standard
-        self.userState = Self.loadUserState(from: .standard)
     }
 
     init(options: Options, userDefaults: UserDefaults) {
         self.options = options
         self.userDefaults = userDefaults
-        self.userState = Self.loadUserState(from: userDefaults)
     }
 
     public func update(settings: Settings, type: UpdateType) {
@@ -194,7 +193,13 @@ extension BrazeDestination {
 
     func start(client: BrazeClient) {
         lock.lock()
-        self.client = client
+        let attach: (BrazeClient) -> Void = { _ in self.attach(client: client) }
+        if self.client == nil {
+            self.client = client
+            pending.insert(attach, at: 0)
+        } else {
+            pending.append(attach)
+        }
         pending.append(contentsOf: readyCallbacks)
         readyCallbacks.removeAll()
         drain()
@@ -232,12 +237,13 @@ extension BrazeDestination {
             return
         }
         isDraining = true
-        while let client = client, !pending.isEmpty {
+        while !pending.isEmpty {
             let work = pending
             pending.removeAll()
             lock.unlock()
             // Customer callbacks may synchronously wait for another thread that calls analytics.
-            work.forEach { $0(client) }
+            // An attachment in this batch can replace the client for subsequent operations.
+            work.forEach { $0(currentClient!) }
             lock.lock()
         }
         isDraining = false
@@ -255,6 +261,32 @@ extension BrazeDestination {
 // MARK: - Identity
 
 extension BrazeDestination {
+    static func storageKey(apiKey: String?, endpoint: String?) -> String? {
+        guard let apiKey = apiKey, !apiKey.isEmpty,
+              let endpoint = endpoint, !endpoint.isEmpty,
+              let configuration = try? JSONEncoder().encode([apiKey, endpoint]) else { return nil }
+        return "\(userStateKey).\(configuration.base64EncodedString())"
+    }
+
+    // Runs in the same ordered drain as events, outside the lock. Never adopt the old global
+    // cache: it cannot be attributed to a Braze configuration safely.
+    private func attach(client: BrazeClient) {
+        stateStorageKey = client.stateStorageKey
+        var state = loadUserState()
+        let currentUserId = client.userId
+        if state.userId == nil || state.userId != currentUserId {
+            // A fresh/different user (including anonymous users) has not received these traits.
+            state.attributes.removeAll()
+        }
+        if let userId = state.userId, userId != currentUserId {
+            client.changeUser(userId: userId)
+        }
+        saveUserState(state)
+        lock.lock()
+        self.client = client
+        lock.unlock()
+    }
+
     private func forwardIdentify(_ event: IdentifyEvent, to client: BrazeClient) {
         var state = userState
         if let userId = event.userId, !userId.isEmpty, userId != state.userId {
@@ -270,16 +302,17 @@ extension BrazeDestination {
         }
     }
 
-    private static func loadUserState(from userDefaults: UserDefaults) -> UserState {
-        guard let data = userDefaults.data(forKey: userStateKey),
+    private func loadUserState() -> UserState {
+        guard let key = stateStorageKey,
+              let data = userDefaults.data(forKey: key),
               let state = try? JSONDecoder().decode(UserState.self, from: data) else { return UserState() }
         return state
     }
 
     private func saveUserState(_ state: UserState) {
         userState = state
-        if let data = try? JSONEncoder().encode(state) {
-            userDefaults.set(data, forKey: Self.userStateKey)
+        if let key = stateStorageKey, let data = try? JSONEncoder().encode(state) {
+            userDefaults.set(data, forKey: key)
         }
     }
 

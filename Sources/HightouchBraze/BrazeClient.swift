@@ -49,6 +49,8 @@ internal enum BrazeUserUpdate: Equatable {
 
 /// The subset of the Braze SDK the destination drives, so the mapping can be tested without BrazeKit.
 internal protocol BrazeClient: AnyObject {
+    var stateStorageKey: String? { get }
+    var userId: String? { get }
     func changeUser(userId: String)
     func update(_ update: BrazeUserUpdate)
     func setAttributionData(network: String, campaign: String, adGroup: String, creative: String)
@@ -62,9 +64,13 @@ import BrazeKit
 
 internal final class BrazeKitClient: BrazeClient {
     let braze: Braze
+    let stateStorageKey: String?
+    var userId: String? { braze.user.id }
 
     init(braze: Braze) {
         self.braze = braze
+        self.stateStorageKey = BrazeDestination.storageKey(apiKey: braze.configuration.api.key,
+                                                         endpoint: braze.configuration.api.endpoint)
     }
 
     func changeUser(userId: String) {
@@ -150,6 +156,8 @@ extension BrazeDestination {
     }
 
     /// Supplies the Braze instance to a destination created with `init(options:)`. Events received before this call are replayed in order.
+    /// Persisted state is scoped to the instance's API key and endpoint. A cached identity is restored before queued events;
+    /// if the instance has a different current user, attributes are resent on the next identify instead of deduplicated.
     public func setBraze(_ braze: Braze) {
         start(client: BrazeKitClient(braze: braze))
     }

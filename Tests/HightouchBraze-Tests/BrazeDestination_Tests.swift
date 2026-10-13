@@ -18,8 +18,18 @@ final class FakeBrazeClient: BrazeClient {
     }
 
     var calls = [Call]()
+    let stateStorageKey: String?
+    var userId: String?
 
-    func changeUser(userId: String) { calls.append(.changeUser(userId)) }
+    init(apiKey: String? = "test-key", endpoint: String? = "sdk.iad-01.braze.com", userId: String? = nil) {
+        self.stateStorageKey = BrazeDestination.storageKey(apiKey: apiKey, endpoint: endpoint)
+        self.userId = userId
+    }
+
+    func changeUser(userId: String) {
+        self.userId = userId
+        calls.append(.changeUser(userId))
+    }
     func update(_ update: BrazeUserUpdate) { calls.append(.update(update)) }
     func setAttributionData(network: String, campaign: String, adGroup: String, creative: String) {
         calls.append(.attribution(network, campaign, adGroup, creative))
@@ -113,6 +123,8 @@ final class BrazeDestination_Tests: XCTestCase {
 
     func testNullClearsStandardAttributesAndPreservesAliasPrecedence() {
         let destination = makeDestination()
+        identify(destination, userId: "u1")
+        client.calls.removeAll()
         let values: [String: Any] = [
             "firstName": "Ada", "lastName": "Lovelace", "email": "ada@example.com",
             "phone": "555-0100", "gender": "female", "birthday": "1990-05-12",
@@ -220,9 +232,79 @@ final class BrazeDestination_Tests: XCTestCase {
 
     func testAttributeCachePersistsAcrossLaunches() {
         identify(makeDestination(), userId: "u1", ["plan": "pro"])
-        client.calls.removeAll()
+        client = FakeBrazeClient(userId: "u1")
         identify(makeDestination(), userId: "u1", ["plan": "pro"])
         XCTAssertEqual(client.calls, [])
+    }
+
+    func testCacheIsScopedToAPIKeyAndEndpoint() {
+        identify(makeDestination(), userId: "u1", ["plan": "pro"])
+        for nextClient in [FakeBrazeClient(apiKey: "other-key"),
+                           FakeBrazeClient(endpoint: "sdk.fra-01.braze.eu")] {
+            client = nextClient
+            let destination = makeDestination()
+            XCTAssertEqual(client.calls, [], "Do not restore another configuration's identity")
+            identify(destination, userId: "u1", ["plan": "pro"])
+            XCTAssertEqual(client.calls, [.changeUser("u1"), .update(.customAttribute("plan", .string("pro")))])
+        }
+    }
+
+    func testAttachmentReconcilesIdentityBeforeQueuedEventsAndResendsTraits() {
+        identify(makeDestination(), userId: "u1", ["plan": "pro"])
+        for currentUser in [nil, "another-user"] as [String?] {
+            client = FakeBrazeClient(userId: currentUser)
+            let destination = makeDestination(start: false)
+            track(destination, "Queued")
+            identify(destination, userId: "u1", ["plan": "pro"])
+            destination.start(client: client)
+            XCTAssertEqual(client.calls, [
+                .changeUser("u1"), .customEvent("Queued", nil),
+                .update(.customAttribute("plan", .string("pro"))),
+            ])
+            identify(destination, userId: "u1", ["plan": "pro"])
+            XCTAssertEqual(client.calls.count, 3)
+        }
+    }
+
+    func testLegacyGlobalCacheIsIgnored() throws {
+        let oldState = BrazeDestination.UserState(userId: "u1", attributes: ["custom.plan": "old-value"])
+        userDefaults.set(try JSONEncoder().encode(oldState), forKey: BrazeDestination.userStateKey)
+        let destination = makeDestination()
+        XCTAssertEqual(client.calls, [])
+        identify(destination, userId: "u1", ["plan": "pro"])
+        XCTAssertEqual(client.calls, [.changeUser("u1"), .update(.customAttribute("plan", .string("pro")))])
+    }
+
+    func testMissingConfigurationDoesNotReusePersistedState() {
+        for _ in 0..<2 {
+            client = FakeBrazeClient(apiKey: nil)
+            identify(makeDestination(), userId: "u1", ["plan": "pro"])
+            XCTAssertEqual(client.calls, [.changeUser("u1"), .update(.customAttribute("plan", .string("pro")))])
+        }
+    }
+
+    func testAnonymousAttributesAreResentToFreshClient() {
+        identify(makeDestination(), ["plan": "pro"])
+        client = FakeBrazeClient()
+        identify(makeDestination(), ["plan": "pro"])
+        XCTAssertEqual(client.calls, [.update(.customAttribute("plan", .string("pro")))])
+    }
+
+    func testReplacingClientAndResetKeepConfigurationCachesSeparate() {
+        let destination = makeDestination()
+        identify(destination, userId: "u1", ["plan": "pro"])
+        let otherClient = FakeBrazeClient(apiKey: "other-key")
+        destination.start(client: otherClient)
+        identify(destination, userId: "u2", ["plan": "max"])
+        destination.reset()
+        client.calls.removeAll()
+        destination.start(client: client)
+        identify(destination, userId: "u1", ["plan": "pro"])
+        XCTAssertEqual(client.calls, [])
+        otherClient.calls.removeAll()
+        destination.start(client: otherClient)
+        identify(destination, userId: "u2", ["plan": "max"])
+        XCTAssertEqual(otherClient.calls, [.changeUser("u2"), .update(.customAttribute("plan", .string("max")))])
     }
 
     func testChangeUserAndResetClearTheCache() {
@@ -714,6 +796,45 @@ final class BrazeDestination_Tests: XCTestCase {
         ])
     }
 
+    func testConcurrentClientReplacementPreservesEventAndCacheOrdering() {
+        let entered = DispatchSemaphore(value: 0)
+        let attached = DispatchSemaphore(value: 0)
+        let drained = expectation(description: "Client replacement drained")
+        let destination = makeDestination(.init(purchaseDetection: .matcher { event in
+            if event.event == "Outer" {
+                entered.signal()
+                XCTAssertEqual(attached.wait(timeout: .now() + 2), .success)
+            }
+            return false
+        }), start: false)
+        identify(destination, userId: "u1", ["plan": "pro"])
+        track(destination, "Outer")
+        track(destination, "Already queued")
+        let originalClient = client!
+        DispatchQueue.global().async {
+            destination.start(client: originalClient)
+            drained.fulfill()
+        }
+        XCTAssertEqual(entered.wait(timeout: .now() + 2), .success)
+        let replacement = FakeBrazeClient(apiKey: "other-key")
+        destination.start(client: replacement)
+        identify(destination, userId: "u2", ["plan": "max"])
+        track(destination, "After replacement")
+        attached.signal()
+        wait(for: [drained], timeout: 5)
+        XCTAssertEqual(originalClient.calls, [
+            .changeUser("u1"), .update(.customAttribute("plan", .string("pro"))),
+            .customEvent("Outer", nil), .customEvent("Already queued", nil),
+        ])
+        XCTAssertEqual(replacement.calls, [
+            .changeUser("u2"), .update(.customAttribute("plan", .string("max"))),
+            .customEvent("After replacement", nil),
+        ])
+        client = FakeBrazeClient(userId: "u1")
+        identify(makeDestination(), userId: "u1", ["plan": "pro"])
+        XCTAssertEqual(client.calls, [], "Replacement must not overwrite the original client's cache")
+    }
+
     func testEventsQueueUntilBrazeIsReady() {
         let destination = makeDestination(start: false)
         var readyCount = 0
@@ -753,6 +874,8 @@ extension BrazeDestination_Tests {
         destination.onReady { readyInstance = $0 }
         XCTAssertNotNil(destination.braze)
         XCTAssertTrue(readyInstance === destination.braze)
+        XCTAssertEqual(destination.currentClient?.stateStorageKey,
+                       BrazeDestination.storageKey(apiKey: "test-api-key", endpoint: "sdk.iad-01.braze.com"))
     }
 }
 #endif
