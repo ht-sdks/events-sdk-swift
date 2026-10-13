@@ -65,8 +65,8 @@ for index in "${!DESTINATIONS[@]}"; do
 		mkdir -p "$contents/Modules" "$contents/Headers"
 		ditto "$modules" "$framework/Modules/$name.swiftmodule"
 		header=$(find "$derived/Build/Intermediates.noindex/ArchiveIntermediates/Hightouch/IntermediateBuildFilesPath" \
-			-path "*/GeneratedModuleMaps-*/*" -name "$name-Swift.h" -print -quit)
-		test -n "$header"
+			-path "*/GeneratedModuleMaps*/*" -name "$name-Swift.h" -print -quit)
+		if [ -z "$header" ]; then echo "error: missing generated header for $name" >&2; exit 1; fi
 		cp "$header" "$framework/Headers/"
 		printf 'framework module %s {\n  header "%s-Swift.h"\n  export *\n}\n' "$name" "$name" > "$framework/Modules/module.modulemap"
 		if [ "$name" = Hightouch ]; then
