@@ -58,7 +58,7 @@ The package requires Swift tools 5.9 or later and tvOS 12 or later. Current Braz
 `12.0.0..<19.0.0`.
 
 `HightouchBraze` is distributed as SwiftPM source and shares the SDK's release tags
-and existing `release.sh` process. It does not require a separate repository or
+and [release process](RELEASING.md). It does not require a separate repository or
 publishing step, and is not included in the core SDK's XCFramework release assets.
 
 ## Example

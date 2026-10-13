@@ -249,19 +249,17 @@ Triggered by tags matching `v[0-9]+.[0-9]+.[0-9]+`. Posts a notification to Slac
 
 ## Releasing
 
-Use `release.sh` to perform releases. The script:
+Follow [RELEASING.md](RELEASING.md). The repository requires PRs for changes to `main`:
 
-1. Validates you are on the `main` branch
-2. Validates the new version is greater than the current version
-3. Updates `Sources/Hightouch/Version.swift` with the new version
-4. Commits the change and pushes
-5. Creates a GitHub Release with a changelog (commits since last tag)
+1. Update `Sources/Hightouch/Version.swift` on a release branch with a greater version.
+2. Open a version-bump PR targeting `main`, wait for CI, and merge it.
+3. Create the version tag and GitHub release from the merged commit on `main`.
+
+Do not run `release.sh`: it still attempts a direct push to `main`. If it already
+created a local version commit before the push was rejected, preserve that commit
+on a release branch and open a PR instead of rerunning the script.
 
 XCFramework assets are **not** built locally. Pushing the release tag triggers [`.github/workflows/xcframework-release.yml`](.github/workflows/xcframework-release.yml), which builds and uploads `Hightouch.zip`, `Hightouch.sha256`, `Sovran.zip`, and `Sovran.sha256` (~5-10 min).
-
-```bash
-./release.sh 1.2.3
-```
 
 ### Required Tools for Releasing
 
@@ -277,7 +275,9 @@ Do **not** run `scripts/build-xcframeworks.sh` locally — CI uses a pinned Xcod
 
 ### Version File
 
-`Sources/Hightouch/Version.swift` is **auto-generated** by `release.sh`. Do NOT edit it by hand. It contains:
+Update `Sources/Hightouch/Version.swift` only as part of the version-bump PR described
+in [RELEASING.md](RELEASING.md). The legacy file header refers to `release.sh`, which
+does not support the current branch protection rules. The version constant is:
 
 ```swift
 internal let __hightouch_version = "X.Y.Z"
