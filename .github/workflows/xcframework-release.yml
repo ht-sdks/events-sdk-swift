@@ -29,7 +29,7 @@ env:
 jobs:
   build-and-upload:
     name: Build and upload XCFrameworks
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - name: Resolve release tag
         id: meta
@@ -66,10 +66,10 @@ jobs:
           ref: ${{ steps.meta.outputs.source_ref }}
           path: ${{ env.RELEASE_SOURCE_DIR }}
 
-      - name: Select Xcode 15.4
+      - name: Select Xcode 26.2
         uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
-          xcode-version: "15.4"
+          xcode-version: "26.2"
 
       - name: Build XCFrameworks
         env:
