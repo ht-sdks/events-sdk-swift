@@ -52,11 +52,23 @@ for index in "${!DESTINATIONS[@]}"; do
 		framework="$BUILD_ROOT/frameworks/$index/$name.framework"
 		test -n "$built"
 		ditto "$built" "$framework"
+		contents="$framework"
+		if [ -d "$framework/Versions/A" ]; then
+			contents="$framework/Versions/A"
+			for directory in Modules Headers; do
+				ln -sfn "Versions/Current/$directory" "$framework/$directory"
+			done
+		fi
 		# SwiftPM archives can omit the Swift modules from the installed framework.
 		modules=$(find "$products" -name "$name.swiftmodule" -type d -print -quit)
 		test -n "$modules"
-		mkdir -p "$framework/Modules"
+		mkdir -p "$contents/Modules" "$contents/Headers"
 		ditto "$modules" "$framework/Modules/$name.swiftmodule"
+		header=$(find "$derived/Build/Intermediates.noindex/ArchiveIntermediates/Hightouch/IntermediateBuildFilesPath" \
+			-path "*/GeneratedModuleMaps-*/*" -name "$name-Swift.h" -print -quit)
+		test -n "$header"
+		cp "$header" "$framework/Headers/"
+		printf 'framework module %s {\n  header "%s-Swift.h"\n  export *\n}\n' "$name" "$name" > "$framework/Modules/module.modulemap"
 		if [ "$name" = Hightouch ]; then
 			# The privacy manifest must travel with the binary framework, not a build-directory bundle.
 			resources="$framework"
