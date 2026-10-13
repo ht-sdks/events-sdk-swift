@@ -26,15 +26,26 @@ echo "Building XCFrameworks ..."
 swift create-xcframework \
 	--clean \
 	--skip-binary-targets \
+	--xc-setting DEFINES_MODULE=YES \
 	--platform ios \
 	--platform macos \
 	--platform maccatalyst \
 	--platform tvos \
 	--platform watchos \
 	--stack-evolution \
-	--zip \
 	Hightouch \
 	Sovran
+
+# The project generator omits SwiftPM resources; include the privacy manifest before zipping.
+for framework in Hightouch.xcframework/*/Hightouch.framework; do
+	resources="$framework"
+	if [[ -d "$framework/Resources" ]]; then resources="$framework/Resources"; fi
+	cp Sources/Hightouch/Resources/PrivacyInfo.xcprivacy "$resources/"
+done
+for name in Hightouch Sovran; do
+	ditto -c -k --keepParent "$name.xcframework" "$name.zip"
+	swift package compute-checksum "$name.zip" > "$name.sha256"
+done
 
 echo "Verifying artifacts ..."
 for artifact in "${ARTIFACTS[@]}"; do

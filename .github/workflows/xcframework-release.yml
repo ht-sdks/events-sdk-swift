@@ -71,6 +71,14 @@ jobs:
         with:
           xcode-version: "26.2"
 
+      - name: Install packaging tool
+        run: ./build-tools/scripts/install-swift-create-xcframework.sh
+
+      - name: Select Xcode 16.4 for SDK compatibility
+        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
+        with:
+          xcode-version: "16.4"
+
       - name: Build XCFrameworks
         env:
           SOURCE_ROOT: ${{ github.workspace }}/${{ env.RELEASE_SOURCE_DIR }}
