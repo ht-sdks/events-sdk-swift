@@ -27,6 +27,7 @@ swift create-xcframework \
 	--clean \
 	--skip-binary-targets \
 	--xc-setting DEFINES_MODULE=YES \
+	--xc-setting CODE_SIGNING_ALLOWED=NO \
 	--platform ios \
 	--platform macos \
 	--platform maccatalyst \
