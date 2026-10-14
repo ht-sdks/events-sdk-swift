@@ -239,7 +239,7 @@ Builds and uploads XCFramework zip assets on tag push (tags like `1.2.3`, no `v`
 | Tag push            | Always uploads to release                    |
 | `workflow_dispatch` | Uploads to release only when `dry_run=false` |
 
-Runs on macOS 14 with Xcode 15.4.
+Runs on macOS 15. Xcode 26.2 compiles the pinned Amplitude fork of `swift-create-xcframework` (requires Swift 6.2 or newer), then Xcode 16.4 builds the SDK frameworks to preserve deployment compatibility.
 
 ### Slack Notification (`.github/workflows/tagged-release.yml`)
 
@@ -270,10 +270,10 @@ XCFramework assets are **not** built locally. Pushing the release tag triggers [
 ### XCFramework CI Workflow
 
 - **Automatic:** tag push runs build + upload
-- **Retry:** Re-run a failed workflow from Actions
-- **Manual dispatch:** Mainly for testing/backfill. Actions → **XCFramework Release** → Run workflow with `tag` set; default `dry_run=true` skips GitHub Release upload
+- **Retry:** Re-run a failed workflow from Actions when no workflow changes are needed. After merging packaging fixes, start a new manual dispatch from `main` to use the updated workflow and scripts.
+- **Manual dispatch:** Actions → **XCFramework Release** → Run workflow, select `main`, and set `tag` to the existing release tag. This uses packaging scripts from `main` and SDK source from the tag. The default `dry_run=true` skips GitHub Release upload; set `dry_run=false` to upload assets to the existing release. There is no need to rerun `release.sh` or recreate the tag.
 
-Do **not** run `scripts/build-xcframeworks.sh` locally — CI uses a pinned Xcode 15.4 environment.
+Do **not** run `scripts/build-xcframeworks.sh` locally — use CI's macOS 15 environment with Xcode 26.2 for tool installation and Xcode 16.4 for SDK archives.
 
 ### Version File
 
