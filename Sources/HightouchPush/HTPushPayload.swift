@@ -22,6 +22,14 @@ enum PayloadKey {
     static let actionIcon = "actionIcon"
     static let iconType = "iconType"
     static let iconName = "iconName"
+
+    // MARK: - Ghost-push command
+    static let command = "command"
+    static let verb = "verb"
+    static let reason = "reason"
+    static let messageIds = "messageIds"
+    static let locationIds = "locationIds"
+    static let syncToken = "syncToken"
 }
 
 struct HTActionButton {
