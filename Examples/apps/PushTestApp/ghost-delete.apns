@@ -1,0 +1,13 @@
+{
+  "Simulator Target Bundle": "REPLACE.WITH.YOUR.BUNDLE.ID",
+  "aps": {
+    "content-available": 1
+  },
+  "hightouch": {
+    "messageId": "01J8Z9K2QW3E4R5T6Y7U8I9O0Q",
+    "command": {
+      "verb": "deleteMessage",
+      "messageId": "msg_abc"
+    }
+  }
+}

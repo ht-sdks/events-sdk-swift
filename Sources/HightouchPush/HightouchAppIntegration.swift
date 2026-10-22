@@ -94,6 +94,12 @@ public enum HightouchAppIntegration {
         didReceiveRemoteNotification userInfo: [AnyHashable: Any],
         fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
     ) {
+        // Checked before HTPushPayload, whose guard drops a command push that has no messageId.
+        if HTMessageCommand(userInfo) != nil {
+            HightouchMessagesTrigger.handle(userInfo: userInfo, completionHandler: completionHandler)
+            return
+        }
+
         guard let payload = HTPushPayload(userInfo),
               let customData = payload.customData, !customData.isEmpty,
               let delegate = HightouchPush.silentPushDelegate else {

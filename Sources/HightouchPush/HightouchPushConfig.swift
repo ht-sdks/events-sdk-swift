@@ -53,6 +53,9 @@ public struct HightouchPushConfig {
     /// Lower bound the interval is clamped to, to avoid per-launch re-uploads.
     public static let minTokenUploadInterval: TimeInterval = 12 * 60 * 60
 
+    /// Enables embedded messages. `nil` (the default) leaves the feature off.
+    public var messages: HightouchMessagesConfig?
+
     public init(appId: String) {
         self.appId = appId
     }
