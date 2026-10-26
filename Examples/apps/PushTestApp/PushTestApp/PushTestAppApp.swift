@@ -76,9 +76,18 @@ final class SilentPushHandler: HightouchSilentPushDelegate {
     }
 }
 
+/// Held in a static because the SDK config keeps only a weak reference to it.
+final class MessagesHandler: HightouchMessagesDelegate {
+    func hightouchMessagesDidChange(_ change: HightouchMessagesChange) {
+        print("[PushTestApp] Messages changed — inserted: \(change.insertedIds), updated: \(change.updatedIds), removed: \(change.removedIds)")
+        print("[PushTestApp] Cached messages now: \(HightouchMessages.messageCount(matching: HightouchMessageQuery()))")
+    }
+}
+
 class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
 
     static let silentPushHandler = SilentPushHandler()
+    static let messagesHandler = MessagesHandler()
 
     func application(
         _ application: UIApplication,
@@ -122,6 +131,10 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         var pushConfig = HightouchPushConfig(appId: appId)
         pushConfig.silentPushDelegate = silentPushHandler
         pushConfig.autoClearBadgeOnForeground = autoClearBadgeOnForeground
+
+        var messagesConfig = HightouchMessagesConfig()
+        messagesConfig.delegate = messagesHandler
+        pushConfig.messages = messagesConfig
 
         let analyticsConfig = Configuration(writeKey: writeKey)
             .trackApplicationLifecycleEvents(true)
