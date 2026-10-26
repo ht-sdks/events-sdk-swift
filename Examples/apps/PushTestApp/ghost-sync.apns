@@ -1,0 +1,18 @@
+{
+  "Simulator Target Bundle": "io.hightouch.highgrounds",
+  "aps": {
+    "content-available": 1
+  },
+  "hightouch": {
+    "messageId": "01J8Z9K2QW3E4R5T6Y7U8I9O0P",
+    "command": {
+      "verb": "syncMessages",
+      "reason": "manual_simulator_test"
+    },
+    "messageContext": {
+      "executionId": "exec_sim_1",
+      "campaignId": "camp_sim_1",
+      "campaignRunId": "run_sim_1"
+    }
+  }
+}
