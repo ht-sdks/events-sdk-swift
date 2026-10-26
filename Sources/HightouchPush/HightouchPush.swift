@@ -44,6 +44,9 @@ public final class HightouchPush {
         return Analytics(configuration: Configuration(writeKey: "uninitialized"))
     }
 
+    /// Lets entry points bail out instead of hitting the `analytics` assertion before initialize().
+    static var isInitialized: Bool { _analytics != nil }
+
     /// Canonical form of a URL scheme: lowercased (schemes are case-insensitive per RFC 3986)
     /// and stripped of surrounding whitespace.
     static func normalizeScheme(_ scheme: String) -> String {
@@ -121,12 +124,17 @@ public final class HightouchPush {
         }
         configureBadgeFeatures(config: config)
         configureForegroundHeartbeat()
+        if let messagesConfig = config.messages {
+            HightouchMessages.initialize(analytics: analytics, config: messagesConfig)
+        }
     }
 
     /// Hex-encode an APNs token (core's `Data.hexString` is module-internal).
     static func hexEncode(_ token: Data) -> String {
         token.map { String(format: "%02x", $0) }.joined()
     }
+
+    static var deviceTokenHex: String? { _apnsToken.map(hexEncode) }
 }
 
 extension HightouchPush {
@@ -261,6 +269,7 @@ extension HightouchPush {
         #endif
 
         emit()
+        HightouchMessages.identityDidChange()
     }
 
     /// The userId of the currently identified user. Nil if no user is identified.
@@ -300,6 +309,7 @@ extension HightouchPush {
 
         _currentUserId = nil
         analytics.reset()
+        HightouchMessages.identityDidChange()
     }
 }
 
