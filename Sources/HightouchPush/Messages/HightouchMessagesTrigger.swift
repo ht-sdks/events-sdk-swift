@@ -49,12 +49,18 @@ enum HightouchMessagesTrigger {
 
         // In the foreground there's no OS budget to protect, so skip the background task and flush.
         let isForeground = UIApplication.shared.applicationState == .active
-        let completion = TriggerCompletion(isForeground: isForeground, completionHandler: completionHandler)
+        let completion = TriggerCompletion(
+            isForeground: isForeground,
+            completionHandler: completionHandler,
+            emitDelivered: { emitDeliveredEvent(command: command, messageCount: $0) }
+        )
         completion.beginBackgroundTaskIfNeeded()
 
+        // `.noData`, not `.failed`: running out of time isn't a failed fetch, and `.failed` counts
+        // against future background delivery. The sync keeps going; its result is just not reported.
         if deadline > 0 {
             DispatchQueue.main.asyncAfter(deadline: .now() + deadline) {
-                completion.complete(.failed)
+                completion.complete(.noData, messageCount: 0)
             }
         }
 
@@ -69,8 +75,7 @@ enum HightouchMessagesTrigger {
                 await delegate.receive(customData: customData)
             }
 
-            emitDeliveredEvent(command: command, messageCount: messageCount)
-            completion.complete(result)
+            completion.complete(result, messageCount: messageCount)
         }
     }
 
@@ -140,26 +145,36 @@ enum HightouchMessagesTrigger {
 }
 
 /// Ensures the completion handler runs once across success, the deadline and background-task
-/// expiration. Calling it twice crashes on some iOS versions.
+/// expiration. Calling it twice crashes on some iOS versions. Whichever path wins also emits the
+/// `delivered` event, before the flush, so it isn't left queued in a process about to be suspended.
 private final class TriggerCompletion {
     private let lock = NSLock()
     private var completionHandler: ((UIBackgroundFetchResult) -> Void)?
+    private let emitDelivered: (Int) -> Void
     private let isForeground: Bool
+    /// Main queue only.
     private var backgroundTaskId: UIBackgroundTaskIdentifier = .invalid
 
-    init(isForeground: Bool, completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
+    init(
+        isForeground: Bool,
+        completionHandler: @escaping (UIBackgroundFetchResult) -> Void,
+        emitDelivered: @escaping (Int) -> Void
+    ) {
         self.isForeground = isForeground
         self.completionHandler = completionHandler
+        self.emitDelivered = emitDelivered
     }
 
     func beginBackgroundTaskIfNeeded() {
         guard !isForeground else { return }
+        // The expiration handler runs on main, and the task must be ended before it returns or the
+        // watchdog kills the app; `complete` finishes synchronously when already on main.
         backgroundTaskId = UIApplication.shared.beginBackgroundTask { [weak self] in
-            self?.complete(.failed)
+            self?.complete(.noData, messageCount: 0)
         }
     }
 
-    func complete(_ result: UIBackgroundFetchResult) {
+    func complete(_ result: UIBackgroundFetchResult, messageCount: Int) {
         lock.lock()
         guard let handler = completionHandler else {
             lock.unlock()
@@ -168,20 +183,30 @@ private final class TriggerCompletion {
         completionHandler = nil
         lock.unlock()
 
-        DispatchQueue.main.async {
-            // A process launched directly into the background never posts didEnterBackground, so the
-            // normal flush never runs and the `delivered` event would sit in the queue.
-            if !self.isForeground {
-                HightouchPush.analytics.flush()
+        if Thread.isMainThread {
+            finish(handler, result: result, messageCount: messageCount)
+        } else {
+            DispatchQueue.main.async {
+                self.finish(handler, result: result, messageCount: messageCount)
             }
+        }
+    }
 
-            handler(result)
+    private func finish(_ handler: (UIBackgroundFetchResult) -> Void, result: UIBackgroundFetchResult, messageCount: Int) {
+        emitDelivered(messageCount)
 
-            if self.backgroundTaskId != .invalid {
-                let taskId = self.backgroundTaskId
-                self.backgroundTaskId = .invalid
-                UIApplication.shared.endBackgroundTask(taskId)
-            }
+        // A process launched directly into the background never posts didEnterBackground, so the
+        // normal flush never runs and the `delivered` event would sit in the queue.
+        if !isForeground {
+            HightouchPush.analytics.flush()
+        }
+
+        handler(result)
+
+        if backgroundTaskId != .invalid {
+            let taskId = backgroundTaskId
+            backgroundTaskId = .invalid
+            UIApplication.shared.endBackgroundTask(taskId)
         }
     }
 }
