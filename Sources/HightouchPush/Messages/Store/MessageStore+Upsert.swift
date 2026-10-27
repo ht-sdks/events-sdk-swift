@@ -16,10 +16,13 @@ extension MessageStore {
     private static let upsertChunkSize = 200
 
     /// Replaces everything stored for `owner` with `messages`: rows not repeated are deleted.
+    /// `limit` keeps only the first messages in `.priorityThenNewest` order, so an owner whose server
+    /// set exceeds the store cap converges instead of being evicted and re-inserted every sync.
     /// `completion` runs on the write queue.
     func replaceAll(
         _ messages: [HightouchMessage],
         owner: MessageOwner,
+        limit: Int? = nil,
         now: Date = Date(),
         suppressing suppressedIds: @escaping () -> Set<String> = { [] },
         completion: ((Result<UpsertOutcome, Error>) -> Void)?
@@ -41,7 +44,10 @@ extension MessageStore {
                     }
                     deduped[message.messageId] = message
                 }
-                let unique = order.map { deduped[$0]! }
+                var unique = order.map { deduped[$0]! }
+                if let limit = limit, unique.count > limit {
+                    unique = Array(unique.sorted(by: MessageStore.priorityThenNewest).prefix(max(limit, 0)))
+                }
 
                 var insertedIds: [String] = []
                 var updatedIds: [String] = []
@@ -125,8 +131,9 @@ extension MessageStore {
         }
     }
 
-    /// Evicts the oldest rows across all owners until at most `maxStoredMessages` remain.
-    func enforceLimit(maxStoredMessages: Int, completion: ((Int) -> Void)? = nil) {
+    /// Evicts the oldest rows until at most `maxStoredMessages` remain. Rows owned by `preserving`
+    /// are never evicted, so a sync never removes the current owner's rows without reporting them.
+    func enforceLimit(maxStoredMessages: Int, preserving owner: MessageOwner? = nil, completion: ((Int) -> Void)? = nil) {
         writeContext.perform {
             guard maxStoredMessages >= 0 else {
                 completion?(0)
@@ -143,6 +150,11 @@ extension MessageStore {
                 }
 
                 let fetch = NSFetchRequest<HTMessageEntity>(entityName: MessageStoreSchema.entityName)
+                if let owner = owner {
+                    fetch.predicate = NSPredicate(
+                        format: "%K != %@", MessageStoreSchema.Attr.ownerKey.rawValue, owner.storageKey
+                    )
+                }
                 fetch.sortDescriptors = [NSSortDescriptor(key: MessageStoreSchema.Attr.insertedAt.rawValue, ascending: true)]
                 fetch.fetchLimit = overage
                 fetch.returnsObjectsAsFaults = false
@@ -160,6 +172,18 @@ extension MessageStore {
                 self.writeContext.reset()
                 completion?(0)
             }
+        }
+    }
+
+    /// Mirrors `HightouchMessageSort.priorityThenNewest`; messages without `createdAt` sort last,
+    /// as nil does in a descending Core Data sort.
+    private static func priorityThenNewest(_ lhs: HightouchMessage, _ rhs: HightouchMessage) -> Bool {
+        if lhs.priorityRank != rhs.priorityRank { return lhs.priorityRank < rhs.priorityRank }
+        switch (lhs.createdAt, rhs.createdAt) {
+        case let (l?, r?) where l != r: return l > r
+        case (_?, nil): return true
+        case (nil, _?): return false
+        default: return lhs.messageId < rhs.messageId
         }
     }
 

@@ -48,11 +48,12 @@ final class MessageStore_Upsert_Tests: XCTestCase {
         _ store: MessageStore,
         _ messages: [HightouchMessage],
         owner: MessageOwner,
+        limit: Int? = nil,
         now: Date = Date()
     ) throws -> UpsertOutcome {
         let expectation = expectation(description: "replaceAll")
         var outcome: Result<UpsertOutcome, Error>?
-        store.replaceAll(messages, owner: owner, now: now) { result in
+        store.replaceAll(messages, owner: owner, limit: limit, now: now) { result in
             outcome = result
             expectation.fulfill()
         }
@@ -61,10 +62,10 @@ final class MessageStore_Upsert_Tests: XCTestCase {
     }
 
     @discardableResult
-    private func enforceLimitSync(_ store: MessageStore, maxStoredMessages: Int) -> Int {
+    private func enforceLimitSync(_ store: MessageStore, maxStoredMessages: Int, preserving owner: MessageOwner? = nil) -> Int {
         let expectation = expectation(description: "enforceLimit")
         var evicted = 0
-        store.enforceLimit(maxStoredMessages: maxStoredMessages) { count in
+        store.enforceLimit(maxStoredMessages: maxStoredMessages, preserving: owner) { count in
             evicted = count
             expectation.fulfill()
         }
@@ -314,6 +315,54 @@ final class MessageStore_Upsert_Tests: XCTestCase {
         let evicted = enforceLimitSync(store, maxStoredMessages: 500)
         XCTAssertEqual(evicted, 0)
         XCTAssertEqual(totalRowCount(store), 1)
+    }
+
+    func testEnforceLimitPreservingAnOwnerEvictsOnlyOtherOwnersRows() throws {
+        let store = try makeStore()
+        let alice = MessageOwner(kind: .userId, id: "alice")
+        let bob = MessageOwner(kind: .userId, id: "bob")
+        let base = Date(timeIntervalSince1970: 1_700_000_000)
+
+        try replaceAllSync(store, [try makeMessage(id: "a1"), try makeMessage(id: "a2")], owner: alice, now: base)
+        try replaceAllSync(store, [try makeMessage(id: "b1")], owner: bob, now: base.addingTimeInterval(1))
+
+        let evicted = enforceLimitSync(store, maxStoredMessages: 2, preserving: alice)
+        XCTAssertEqual(evicted, 1)
+        XCTAssertNotNil(store.message(withId: "a1", owner: alice), "the preserved owner's rows are never evicted, even when oldest")
+        XCTAssertNotNil(store.message(withId: "a2", owner: alice))
+        XCTAssertNil(store.message(withId: "b1", owner: bob))
+    }
+
+    func testReplaceAllWithALimitKeepsTheHighestPriorityNewestMessages() throws {
+        let store = try makeStore()
+        let owner = MessageOwner(kind: .userId, id: "alice")
+        let base = Date(timeIntervalSince1970: 1_700_000_000)
+        let oldNormal = try makeMessage(id: "old_normal", createdAt: base)
+        let newNormal = try makeMessage(id: "new_normal", createdAt: base.addingTimeInterval(10))
+        let oldHigh = try makeMessage(id: "old_high", priority: "high", createdAt: base)
+        let undated = try makeMessage(id: "undated")
+
+        let outcome = try replaceAllSync(store, [oldNormal, undated, newNormal, oldHigh], owner: owner, limit: 2)
+
+        XCTAssertEqual(Set(outcome.insertedIds), ["old_high", "new_normal"])
+        XCTAssertEqual(totalRowCount(store), 2)
+    }
+
+    func testReplaceAllWithALimitReportsPreviouslyStoredRowsItDropsAsRemoved() throws {
+        let store = try makeStore()
+        let owner = MessageOwner(kind: .userId, id: "alice")
+        let base = Date(timeIntervalSince1970: 1_700_000_000)
+        let older = try makeMessage(id: "older", createdAt: base)
+        let newer = try makeMessage(id: "newer", createdAt: base.addingTimeInterval(10))
+        try replaceAllSync(store, [older], owner: owner)
+
+        let outcome = try replaceAllSync(store, [older, newer], owner: owner, limit: 1)
+
+        XCTAssertEqual(outcome.insertedIds, ["newer"])
+        XCTAssertEqual(outcome.removedIds, ["older"])
+
+        let repeated = try replaceAllSync(store, [older, newer], owner: owner, limit: 1)
+        XCTAssertTrue(repeated.insertedIds.isEmpty && repeated.removedIds.isEmpty, "a capped set must converge, not churn")
     }
 }
 #endif
