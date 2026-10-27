@@ -14,4 +14,10 @@ final class AnalyticsConfigurationAccess_Tests: XCTestCase {
         let analytics = Analytics(configuration: configuration)
         XCTAssertEqual(analytics.writeKey, "\(name)")
     }
+
+    #if DEBUG
+    func testIsRunningUnitTestsIsTrueUnderXCTest() {
+        XCTAssertTrue(Analytics.isRunningUnitTests)
+    }
+    #endif
 }
