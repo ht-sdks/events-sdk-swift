@@ -5,7 +5,8 @@ import Hightouch
 import CoreData
 
 /// Fetches messages and reconciles them into the store. Cooldown and coalescing are per owner: a
-/// sync for a different owner than the one in flight is queued behind it, not joined to it.
+/// sync for a different owner than the one in flight is queued behind it, not joined to it. So is a
+/// forced sync for the same owner, since the in-flight response may predate whatever forced it.
 final class MessagesSyncCoordinator {
     typealias Completion = (Result<HightouchMessagesChange, Error>) -> Void
 
@@ -32,7 +33,7 @@ final class MessagesSyncCoordinator {
     private var inFlightOwner: MessageOwner?
     private var inFlightCompletions: [Completion] = []
     /// Re-resolves the owner when it starts.
-    private var queuedFollowUp: (force: Bool, completions: [Completion])?
+    private var queuedFollowUp: (force: Bool, updatesCooldown: Bool, completions: [Completion])?
 
     init(
         analytics: Analytics,
@@ -60,25 +61,29 @@ final class MessagesSyncCoordinator {
     }
 
     /// `completion` always runs on the main queue. Skipped syncs report an empty success.
-    func sync(force: Bool, completion: Completion?) {
+    /// `updatesCooldown: false` leaves the cooldown unstamped, for a sync whose response may be
+    /// incomplete (see `HightouchMessages.identityDidChange()`).
+    func sync(force: Bool, updatesCooldown: Bool = true, completion: Completion?) {
         stateQueue.async {
-            self.begin(force: force, completions: completion.map { [$0] } ?? [])
+            self.begin(force: force, updatesCooldown: updatesCooldown, completions: completion.map { [$0] } ?? [])
         }
     }
 
     /// Must be called on `stateQueue`.
-    private func begin(force: Bool, completions: [Completion]) {
-        guard let owner = ownerProvider(analytics) else {
+    private func begin(force: Bool, updatesCooldown: Bool, completions: [Completion]) {
+        // The gateway always answers an anonymous id with an empty inbox.
+        guard let owner = ownerProvider(analytics), owner.kind == .userId else {
             deliver(.success(HightouchMessagesChange()), to: completions)
             return
         }
 
         if let inFlightOwner = inFlightOwner {
-            if inFlightOwner == owner {
+            if inFlightOwner == owner && !force {
                 inFlightCompletions += completions
             } else {
                 let pending = queuedFollowUp
                 queuedFollowUp = (force: force || (pending?.force ?? false),
+                                  updatesCooldown: updatesCooldown && (pending?.updatesCooldown ?? true),
                                   completions: (pending?.completions ?? []) + completions)
             }
             return
@@ -105,20 +110,23 @@ final class MessagesSyncCoordinator {
 
         inFlightOwner = owner
         inFlightCompletions = completions
-        performFetch(owner: owner, deviceToken: deviceToken, retriesRemaining: 1)
+        performFetch(owner: owner, deviceToken: deviceToken, updatesCooldown: updatesCooldown, retriesRemaining: 1)
     }
 
-    private func performFetch(owner: MessageOwner, deviceToken: String, retriesRemaining: Int) {
+    private func performFetch(owner: MessageOwner, deviceToken: String, updatesCooldown: Bool, retriesRemaining: Int) {
         client.fetchMessages(owner: owner, deviceToken: deviceToken) { [weak self] result in
             guard let self = self else { return }
             switch result {
             case .success(let response):
-                self.handleFetchSuccess(response, owner: owner)
+                self.handleFetchSuccess(response, owner: owner, updatesCooldown: updatesCooldown)
             case .failure(let error):
                 if retriesRemaining > 0, MessagesSyncCoordinator.isRetryable(error) {
                     let delay = TimeInterval.random(in: MessagesSyncCoordinator.retryDelayRange)
                     DispatchQueue.global().asyncAfter(deadline: .now() + delay) {
-                        self.performFetch(owner: owner, deviceToken: deviceToken, retriesRemaining: retriesRemaining - 1)
+                        self.performFetch(
+                            owner: owner, deviceToken: deviceToken,
+                            updatesCooldown: updatesCooldown, retriesRemaining: retriesRemaining - 1
+                        )
                     }
                 } else {
                     self.analytics.reportInternalError(error)
@@ -137,23 +145,27 @@ final class MessagesSyncCoordinator {
     }
 
     /// Each store call is a `perform` on the same serial context, so they run in order.
-    private func handleFetchSuccess(_ response: MessagesFetchResponse, owner: MessageOwner) {
+    private func handleFetchSuccess(_ response: MessagesFetchResponse, owner: MessageOwner, updatesCooldown: Bool) {
         if response.malformedCount > 0 {
             analytics.reportInternalError(MalformedMessagesError(count: response.malformedCount))
         }
 
         // The server still returns dismissed messages; a closure so the log is read on the write
         // queue (see `replaceAll`).
-        store.replaceAll(response.messages, owner: owner, suppressing: {
+        store.replaceAll(response.messages, owner: owner, limit: config.maxStoredMessages, suppressing: {
             HightouchMessages.dismissedIds(owner: owner)
         }) { [weak self] result in
             guard let self = self else { return }
             switch result {
             case .success(let outcome):
                 self.store.pruneExpired()
-                self.store.enforceLimit(maxStoredMessages: self.config.maxStoredMessages) { _ in
-                    self.userDefaults.set(Date().timeIntervalSince1970, forKey: MessagesSyncCoordinator.lastSyncedAtDefaultsKey)
-                    self.userDefaults.set(owner.storageKey, forKey: MessagesSyncCoordinator.lastSyncedOwnerDefaultsKey)
+                // `owner` already fits under the cap (see `replaceAll`'s limit), so only other
+                // owners' rows are evicted and every change to `owner` is in `outcome`.
+                self.store.enforceLimit(maxStoredMessages: self.config.maxStoredMessages, preserving: owner) { _ in
+                    if updatesCooldown {
+                        self.userDefaults.set(Date().timeIntervalSince1970, forKey: MessagesSyncCoordinator.lastSyncedAtDefaultsKey)
+                        self.userDefaults.set(owner.storageKey, forKey: MessagesSyncCoordinator.lastSyncedOwnerDefaultsKey)
+                    }
 
                     let change = HightouchMessagesChange(
                         insertedIds: outcome.insertedIds,
@@ -181,7 +193,7 @@ final class MessagesSyncCoordinator {
 
             if let followUp = self.queuedFollowUp {
                 self.queuedFollowUp = nil
-                self.begin(force: followUp.force, completions: followUp.completions)
+                self.begin(force: followUp.force, updatesCooldown: followUp.updatesCooldown, completions: followUp.completions)
             }
         }
     }

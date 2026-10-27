@@ -8,7 +8,7 @@ import CoreData
 final class StubMessagesURLProtocol: URLProtocol {
     private static let lock = NSLock()
     private static var queuedResponses: [(status: Int, body: Data)] = []
-    private static var lastResponse: (status: Int, body: Data) = (200, Data("{}".utf8))
+    private static var lastResponse: (status: Int, body: Data) = (200, Data(#"{"messages":[]}"#.utf8))
     private(set) static var requestCount = 0
     private(set) static var capturedRequests: [URLRequest] = []
     private(set) static var capturedBodies: [Data?] = []
@@ -16,7 +16,7 @@ final class StubMessagesURLProtocol: URLProtocol {
     static func reset() {
         lock.lock(); defer { lock.unlock() }
         queuedResponses = []
-        lastResponse = (200, Data("{}".utf8))
+        lastResponse = (200, Data(#"{"messages":[]}"#.utf8))
         requestCount = 0
         capturedRequests = []
         capturedBodies = []
@@ -292,11 +292,111 @@ final class MessagesSync_Tests: XCTestCase {
 
         let first = expectation(description: "first completion")
         let second = expectation(description: "second completion")
-        coordinator.sync(force: true) { _ in first.fulfill() }
-        coordinator.sync(force: true) { _ in second.fulfill() }
+        coordinator.sync(force: false) { _ in first.fulfill() }
+        coordinator.sync(force: false) { _ in second.fulfill() }
         wait(for: [first, second], timeout: 5)
 
         XCTAssertEqual(StubMessagesURLProtocol.requestCount, 1, "a request already in flight must not trigger a second one")
+    }
+
+    func testForcedSyncDuringAnInFlightRequestFetchesAgainAfterIt() throws {
+        let store = try makeStore()
+        let analytics = makeAnalytics(writeKey: "\(name)-forced-follow-up")
+        let owner = MessageOwner(kind: .userId, id: "alice-\(name)")
+        let coordinator = makeCoordinator(analytics: analytics, store: store, ownerProvider: { _ in owner })
+        StubMessagesURLProtocol.enqueue(status: 200, body: try messagesBody(["m1"]))
+        StubMessagesURLProtocol.enqueue(status: 200, body: try messagesBody(["m1", "m2"]))
+        StubMessagesURLProtocol.enqueue(status: 200, body: try messagesBody(["m1", "m2", "m3"]))
+
+        let first = expectation(description: "in-flight sync")
+        let second = expectation(description: "first forced sync")
+        let third = expectation(description: "second forced sync")
+        var forcedChanges: [HightouchMessagesChange] = []
+        coordinator.sync(force: false) { _ in first.fulfill() }
+        coordinator.sync(force: true) { result in
+            if case .success(let change) = result { forcedChanges.append(change) }
+            second.fulfill()
+        }
+        coordinator.sync(force: true) { result in
+            if case .success(let change) = result { forcedChanges.append(change) }
+            third.fulfill()
+        }
+        wait(for: [first, second, third], timeout: 5)
+
+        XCTAssertEqual(StubMessagesURLProtocol.requestCount, 2, "forced syncs queue one follow-up fetch, coalesced")
+        XCTAssertEqual(forcedChanges.map { Set($0.insertedIds) }, [["m2"], ["m2"]], "forced callers get the follow-up's result")
+        XCTAssertEqual(Set(store.messages(matching: HightouchMessageQuery(), owner: owner).map { $0.messageId }), ["m1", "m2"])
+    }
+
+    func testAnonymousOwnerMakesNoHTTPRequest() throws {
+        let store = try makeStore()
+        let analytics = makeAnalytics(writeKey: "\(name)-anonymous")
+        let owner = MessageOwner(kind: .anonymousId, id: "anon-\(name)")
+        let coordinator = makeCoordinator(analytics: analytics, store: store, ownerProvider: { _ in owner })
+
+        let result = try syncSync(coordinator)
+        guard case .success(let change) = result else { return XCTFail("an anonymous owner must report success/no-op") }
+        XCTAssertTrue(change.insertedIds.isEmpty && change.updatedIds.isEmpty && change.removedIds.isEmpty)
+        XCTAssertEqual(StubMessagesURLProtocol.requestCount, 0, "the gateway always returns an empty inbox for anonymous ids")
+    }
+
+    func testA200WithoutAMessagesArrayFailsAndKeepsTheCache() throws {
+        let store = try makeStore()
+        let analytics = makeAnalytics(writeKey: "\(name)-missing-array")
+        let owner = MessageOwner(kind: .userId, id: "alice-\(name)")
+        let coordinator = makeCoordinator(analytics: analytics, store: store, ownerProvider: { _ in owner })
+        StubMessagesURLProtocol.enqueue(status: 200, body: try messagesBody(["m1"]))
+        _ = try syncSync(coordinator)
+
+        StubMessagesURLProtocol.enqueue(status: 200, body: Data(#"{"error":"upstream"}"#.utf8))
+        StubMessagesURLProtocol.enqueue(status: 200, body: Data(#"{"messages":null}"#.utf8))
+        let result = try syncSync(coordinator)
+
+        guard case .failure = result else { return XCTFail("a body without a messages array must fail the sync") }
+        XCTAssertEqual(store.messages(matching: HightouchMessageQuery(), owner: owner).map { $0.messageId }, ["m1"])
+    }
+
+    func testSyncThatDoesNotUpdateTheCooldownLeavesTheNextUnforcedSyncFree() throws {
+        let store = try makeStore()
+        let analytics = makeAnalytics(writeKey: "\(name)-no-stamp")
+        let owner = MessageOwner(kind: .userId, id: "alice-\(name)")
+        var config = HightouchMessagesConfig()
+        config.foregroundSyncCooldown = 3600
+        let coordinator = makeCoordinator(analytics: analytics, store: store, config: config, ownerProvider: { _ in owner })
+
+        let first = expectation(description: "identity sync")
+        coordinator.sync(force: false, updatesCooldown: false) { _ in first.fulfill() }
+        wait(for: [first], timeout: 5)
+        _ = try syncSync(coordinator, force: false)
+
+        XCTAssertEqual(StubMessagesURLProtocol.requestCount, 2, "an unstamped sync must not start the cooldown")
+    }
+
+    // MARK: - Store cap
+
+    func testAnOwnerOverTheCapConvergesAndEvictsOnlyOtherOwners() throws {
+        let store = try makeStore()
+        let analytics = makeAnalytics(writeKey: "\(name)-cap")
+        let alice = MessageOwner(kind: .userId, id: "alice-\(name)")
+        let bob = MessageOwner(kind: .userId, id: "bob-\(name)")
+        var owner = bob
+        var config = HightouchMessagesConfig()
+        config.maxStoredMessages = 2
+        let coordinator = makeCoordinator(analytics: analytics, store: store, config: config, ownerProvider: { _ in owner })
+
+        StubMessagesURLProtocol.enqueue(status: 200, body: try messagesBody(["b1"]))
+        _ = try syncSync(coordinator)
+
+        owner = alice
+        StubMessagesURLProtocol.enqueue(status: 200, body: try messagesBody(["a1", "a2", "a3"]))
+        guard case .success(let first) = try syncSync(coordinator) else { return XCTFail("expected success") }
+        XCTAssertEqual(first.insertedIds.count, 2)
+        XCTAssertEqual(store.messages(matching: HightouchMessageQuery(), owner: alice).count, 2)
+        XCTAssertTrue(store.messages(matching: HightouchMessageQuery(), owner: bob).isEmpty, "other owners' rows are evicted first")
+
+        StubMessagesURLProtocol.enqueue(status: 200, body: try messagesBody(["a1", "a2", "a3"]))
+        guard case .success(let second) = try syncSync(coordinator) else { return XCTFail("expected success") }
+        XCTAssertTrue(second.insertedIds.isEmpty && second.removedIds.isEmpty, "the same server set must not churn")
     }
 
     // MARK: - Cooldown

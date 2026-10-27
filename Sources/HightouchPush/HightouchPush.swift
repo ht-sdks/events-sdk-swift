@@ -26,7 +26,22 @@ public final class HightouchPush {
     static var tokenUploadInterval: TimeInterval {
         _config?.tokenUploadInterval ?? HightouchPushConfig.defaultTokenUploadInterval
     }
-    private static var _apnsToken: Data?
+    // Locked, unlike the rest: the messages sync coordinator reads it (via `deviceTokenHex`) on a
+    // background queue while `register(token:)` writes it on main.
+    private static let apnsTokenLock = NSLock()
+    private static var _apnsTokenStorage: Data?
+    private static var _apnsToken: Data? {
+        get {
+            apnsTokenLock.lock()
+            defer { apnsTokenLock.unlock() }
+            return _apnsTokenStorage
+        }
+        set {
+            apnsTokenLock.lock()
+            defer { apnsTokenLock.unlock() }
+            _apnsTokenStorage = newValue
+        }
+    }
     private static var _currentUserId: String?
     #if os(iOS) || targetEnvironment(macCatalyst)
     private static var foregroundHeartbeatObserverToken: NSObjectProtocol?
@@ -151,6 +166,8 @@ extension HightouchPush {
     /// 2. Fires track("CEP Push Token Events") "registered" — deduped, since iOS re-fires this per
     ///    launch: only when the token changed or the heartbeat interval elapsed (see
     ///    `shouldUploadToken`). `identify(...)` bypasses the dedup so a login always re-associates.
+    /// 3. After that login re-association, flushes it and syncs messages for the new user, whose
+    ///    inbox the gateway can't serve until the token is linked.
     public static func register(token: Data) {
         let previousToken = _apnsToken
         let hexToken = hexEncode(token)
@@ -183,6 +200,11 @@ extension HightouchPush {
             "token": hexToken,
             "platform": "ios",
         ])
+
+        if forceUpload {
+            analytics.flush()
+            HightouchMessages.identityDidChange()
+        }
     }
 
     /// Re-upload when the token changed since the last upload, or the heartbeat interval has
@@ -261,7 +283,8 @@ extension HightouchPush {
 
         #if os(iOS) || targetEnvironment(macCatalyst)
         // The OS re-fires didRegister (→ register) with the same token; force that upload past the
-        // heartbeat dedup so the token is re-associated with the new user.
+        // heartbeat dedup so the token is re-associated with the new user. That `register` also
+        // starts the messages sync, which needs the association.
         _forceUploadNextRegister = true
         DispatchQueue.main.async {
             UIApplication.shared.registerForRemoteNotifications()
@@ -269,7 +292,10 @@ extension HightouchPush {
         #endif
 
         emit()
+
+        #if !(os(iOS) || targetEnvironment(macCatalyst))
         HightouchMessages.identityDidChange()
+        #endif
     }
 
     /// The userId of the currently identified user. Nil if no user is identified.
@@ -307,9 +333,9 @@ extension HightouchPush {
             ])
         }
 
+        // No messages sync: the new anonymous id's inbox is always empty.
         _currentUserId = nil
         analytics.reset()
-        HightouchMessages.identityDidChange()
     }
 }
 
