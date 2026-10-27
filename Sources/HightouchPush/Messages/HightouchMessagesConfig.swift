@@ -24,7 +24,9 @@ public struct HightouchMessagesConfig {
     /// Minimum time between foreground syncs for the same user. Clamped to at least 60 seconds.
     public var foregroundSyncCooldown: TimeInterval = 15 * 60
 
-    /// Maximum messages kept locally across all users; oldest-inserted are evicted first.
+    /// Maximum messages kept locally across all users. A sync keeps the current user's
+    /// highest-priority, newest messages up to this cap, then evicts other users' oldest-inserted
+    /// messages to stay under it.
     public var maxStoredMessages: Int = 500
 
     /// Applied last to every fetch request, e.g. to route through a proxy.

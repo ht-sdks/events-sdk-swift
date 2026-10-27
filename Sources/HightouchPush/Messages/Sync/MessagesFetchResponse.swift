@@ -6,6 +6,10 @@ struct MalformedMessagesError: Error {
     let count: Int
 }
 
+/// A 2xx body with no `messages` array. Failing the sync matters: parsing it as empty would make
+/// `replaceAll` delete every cached message for the owner.
+struct MissingMessagesArrayError: Error {}
+
 /// The decoded result of a messages fetch. Treated as the authoritative full set for the owner:
 /// `replaceAll` deletes anything it omits, so a paged response would lose data.
 struct MessagesFetchResponse {
@@ -13,8 +17,8 @@ struct MessagesFetchResponse {
     let syncedAt: Date?
     let malformedCount: Int
 
-    /// Accepts `{"messages": [...]}` or a bare array. A malformed entry is counted and dropped;
-    /// it never fails the whole sync.
+    /// Accepts `{"messages": [...]}` or a bare array; anything else throws. A malformed entry is
+    /// counted and dropped; it never fails the whole sync.
     static func parse(_ data: Data) throws -> MessagesFetchResponse {
         let envelope = try JSONDecoder().decode(JSON.self, from: data)
 
@@ -24,14 +28,13 @@ struct MessagesFetchResponse {
         case .array(let array):
             rawMessages = array
         case .object(let object):
-            if case .array(let array)? = object["messages"] {
-                rawMessages = array
-            } else {
-                rawMessages = []
+            guard case .array(let array)? = object["messages"] else {
+                throw MissingMessagesArrayError()
             }
+            rawMessages = array
             syncedAt = MessagesISO8601.date(from: object["syncedAt"])
         default:
-            rawMessages = []
+            throw MissingMessagesArrayError()
         }
 
         var messages: [HightouchMessage] = []

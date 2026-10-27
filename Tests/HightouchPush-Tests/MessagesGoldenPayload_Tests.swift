@@ -151,12 +151,23 @@ final class MessagesGoldenPayload_Tests: XCTestCase {
 
     // 200 messages per chunk.
 
-    func testBareObjectEnvelopeYieldsNothingAndReportsNothing() throws {
-        let bareObject = #"{"messageId":"msg_1","variantSlug":"two-button"}"#
-        let response = try MessagesFetchResponse.parse(XCTUnwrap(bareObject.data(using: .utf8)))
+    func testBareObjectEnvelopeThrowsRatherThanParsingAsEmpty() throws {
+        let bareObject = try XCTUnwrap(#"{"messageId":"msg_1","variantSlug":"two-button"}"#.data(using: .utf8))
+        XCTAssertThrowsError(try MessagesFetchResponse.parse(bareObject), "an empty parse would wipe the owner's cache") {
+            XCTAssertTrue($0 is MissingMessagesArrayError)
+        }
+    }
 
+    func testNullOrNonArrayMessagesThrows() throws {
+        for body in [#"{"messages":null}"#, #"{"messages":{}}"#, #""messages""#, "42"] {
+            XCTAssertThrowsError(try MessagesFetchResponse.parse(XCTUnwrap(body.data(using: .utf8))), body)
+        }
+    }
+
+    func testEmptyMessagesArrayIsAnAuthoritativeEmptySet() throws {
+        let response = try MessagesFetchResponse.parse(XCTUnwrap(#"{"messages":[]}"#.data(using: .utf8)))
         XCTAssertEqual(response.messages.count, 0)
-        XCTAssertEqual(response.malformedCount, 0, "the silent case: no messages and no error either")
+        XCTAssertEqual(response.malformedCount, 0)
     }
 
     func testEmptyMessageIdIsDroppedAsMalformed() throws {

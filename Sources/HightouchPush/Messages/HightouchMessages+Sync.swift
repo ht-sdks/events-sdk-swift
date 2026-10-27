@@ -36,40 +36,30 @@ extension HightouchMessages {
         #endif
     }
 
-    /// Not forced: the cooldown is per user, so a new identity syncs immediately.
+    /// Not forced: the cooldown is per user, so a new identity syncs immediately. The gateway only
+    /// answers once it has linked the device token to the new user, which happens asynchronously
+    /// after the token re-registration, so this sync doesn't stamp the cooldown: an early, empty
+    /// response mustn't hold off the next foreground sync.
     static func identityDidChange() {
         #if canImport(CoreData) && (os(iOS) || os(macOS) || targetEnvironment(macCatalyst))
         #if DEBUG
-        if messagesIsUnitTesting { return }
+        if Analytics.isRunningUnitTests { return }
         #endif
-        syncInternal(force: false, completion: nil)
+        syncInternal(force: false, updatesCooldown: false, completion: nil)
         #endif
     }
 
     /// Forced, because launch is the only reconcile point for an app that was force-quit when a
-    /// ghost push arrived. Dispatched so it runs after `initialize`'s `stateQueue` lock is released.
+    /// ghost push arrived.
     static func syncOnInitialize() {
         #if canImport(CoreData) && (os(iOS) || os(macOS) || targetEnvironment(macCatalyst))
         #if DEBUG
         // Skip the live request under unit tests, like the core SDK's settings fetch does.
-        if messagesIsUnitTesting { return }
+        if Analytics.isRunningUnitTests { return }
         #endif
-        DispatchQueue.global(qos: .utility).async {
-            syncInternal(force: true, completion: nil)
-        }
+        syncInternal(force: true, completion: nil)
         #endif
     }
-
-    #if DEBUG
-    /// Local copy of the core SDK's `isUnitTesting`, which is internal to `Hightouch`.
-    static let messagesIsUnitTesting: Bool = {
-        if NSClassFromString("XCTestCase") != nil { return true }
-        let matches = Thread.callStackSymbols.filter {
-            $0.contains("XCTest") || $0.contains("xctest")
-        }
-        return !matches.isEmpty
-    }()
-    #endif
 
     #if canImport(CoreData) && (os(iOS) || os(macOS) || targetEnvironment(macCatalyst))
 
@@ -130,7 +120,23 @@ extension HightouchMessages {
     static func configureMessagesForegroundSync(config: HightouchMessagesConfig) {}
     #endif
 
-    private static func syncInternal(force: Bool, completion: ((HightouchSyncOutcome) -> Void)?) {
+    /// Queued behind any pending store open, so a sync requested right after `initialize` (e.g. by
+    /// a ghost push that launched the app) isn't dropped for want of a coordinator.
+    private static func syncInternal(
+        force: Bool,
+        updatesCooldown: Bool = true,
+        completion: ((HightouchSyncOutcome) -> Void)?
+    ) {
+        setupQueue.async {
+            syncWithCurrentCoordinator(force: force, updatesCooldown: updatesCooldown, completion: completion)
+        }
+    }
+
+    private static func syncWithCurrentCoordinator(
+        force: Bool,
+        updatesCooldown: Bool,
+        completion: ((HightouchSyncOutcome) -> Void)?
+    ) {
         guard let coordinator = syncStateQueue.sync(execute: { _syncCoordinator }) else {
             if let completion = completion {
                 DispatchQueue.main.async { completion(.unchanged) }
@@ -138,7 +144,7 @@ extension HightouchMessages {
             return
         }
 
-        coordinator.sync(force: force) { result in
+        coordinator.sync(force: force, updatesCooldown: updatesCooldown) { result in
             let outcome: HightouchSyncOutcome
             switch result {
             case .success(let change):

@@ -16,6 +16,10 @@ public final class HightouchMessages {
 
     private static let queryQueue = DispatchQueue(label: "com.hightouch.messages.query")
 
+    /// Opens the store off the caller's thread so `initialize` never blocks launch on Core Data I/O.
+    /// Anything that needs the store waits for, or queues behind, the work enqueued here.
+    static let setupQueue = DispatchQueue(label: "com.hightouch.messages.setup")
+
     /// Key for the `HightouchMessagesChange` in `.hightouchMessagesDidChange`'s `userInfo`.
     public static let changeUserInfoKey = "com.hightouch.messages.change"
 
@@ -31,12 +35,14 @@ public final class HightouchMessages {
 
     /// Test seam.
     static var openStoreIdentityForTesting: ObjectIdentifier? {
-        stateQueue.sync { _store.map(ObjectIdentifier.init) }
+        setupQueue.sync {}
+        return stateQueue.sync { _store.map(ObjectIdentifier.init) }
     }
     #endif
 
     /// Test seam: resets all static state to "never initialized".
     static func resetForTesting() {
+        setupQueue.sync {}
         MessageDismissalLog().clear()
         stateQueue.sync {
             _analytics = nil
@@ -62,47 +68,55 @@ public final class HightouchMessages {
         stateQueue.sync {
             _analytics = analytics
             _config = config
-
-            #if canImport(CoreData) && (os(iOS) || os(macOS) || targetEnvironment(macCatalyst))
-            openStoreIfNeeded(analytics: analytics)
-            // The launch sync runs after this lock is released; starting it inside would deadlock.
-            configureMessagesForegroundSync(config: config)
-            configureMessagesSyncCoordinator(analytics: analytics, config: config, store: _store)
-            #endif
         }
 
         #if canImport(CoreData) && (os(iOS) || os(macOS) || targetEnvironment(macCatalyst))
+        configureMessagesForegroundSync(config: config)
+        let location = testStoreLocation ?? .appContainer
+        setupQueue.async {
+            let store = openStoreIfNeeded(analytics: analytics, location: location)
+            configureMessagesSyncCoordinator(analytics: analytics, config: config, store: store)
+        }
         if config.syncOnLaunch { syncOnInitialize() }
         #endif
     }
 
     #if canImport(CoreData) && (os(iOS) || os(macOS) || targetEnvironment(macCatalyst))
     /// Keyed on the resolved store URL so repeated initialization never opens two stores over one
-    /// SQLite file. Must be called on `stateQueue`.
-    private static func openStoreIfNeeded(analytics: Analytics) {
+    /// SQLite file. Must be called on `setupQueue`, which serializes it; the open itself runs
+    /// outside `stateQueue` so queries aren't held up behind it.
+    private static func openStoreIfNeeded(analytics: Analytics, location: MessageStore.Location) -> MessageStore? {
         let writeKey = analytics.writeKey
-        let location = testStoreLocation ?? .appContainer
         let resolvedURL = try? MessageStoreLocation.storeURL(
             for: location, writeKey: writeKey, modelVersion: MessageStoreSchema.modelVersion
         )
 
-        if _store != nil, let resolvedURL = resolvedURL, resolvedURL == _storeURL {
-            return
+        let (openStore, openURL) = stateQueue.sync { (_store, _storeURL) }
+        if let openStore = openStore, let resolvedURL = resolvedURL, resolvedURL == openURL {
+            return openStore
         }
 
         do {
             let store = try MessageStore(writeKey: writeKey, location: location)
-            _store = store
-            _storeURL = resolvedURL
+            stateQueue.sync {
+                _store = store
+                _storeURL = resolvedURL
+            }
             store.pruneExpired()
+            return store
         } catch {
-            _store = nil
-            _storeURL = nil
+            stateQueue.sync {
+                _store = nil
+                _storeURL = nil
+            }
             analytics.reportInternalError(error)
+            return nil
         }
     }
 
+    /// Blocks until a pending `initialize` has opened the store. Never call it on `setupQueue`.
     private static func currentStoreAndOwner() -> (MessageStore, MessageOwner)? {
+        setupQueue.sync {}
         let (analytics, store) = stateQueue.sync { (_analytics, _store) }
         guard let analytics = analytics, let store = store else { return nil }
         guard let owner = MessageOwner.current(analytics: analytics) else { return nil }
@@ -112,6 +126,8 @@ public final class HightouchMessages {
 
     /// Returns cached messages matching `query` for the current user. Reading doesn't remove
     /// anything; a message stays until it's dismissed, expires or the server stops returning it.
+    /// Right after `initialize`, this and the other synchronous reads wait for the store to open;
+    /// use `loadMessages(matching:)` to avoid blocking the main thread.
     public static func messages(matching query: HightouchMessageQuery) -> [HightouchMessage] {
         #if canImport(CoreData) && (os(iOS) || os(macOS) || targetEnvironment(macCatalyst))
         guard let (store, owner) = currentStoreAndOwner() else { return [] }
@@ -212,6 +228,7 @@ public final class HightouchMessages {
     /// debug tooling.
     public static func clearAllCachedMessagesForAllUsers(completion: ((Int) -> Void)? = nil) {
         #if canImport(CoreData) && (os(iOS) || os(macOS) || targetEnvironment(macCatalyst))
+        setupQueue.sync {}
         guard let store = stateQueue.sync(execute: { _store }) else {
             DispatchQueue.main.async { completion?(0) }
             return
