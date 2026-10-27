@@ -64,7 +64,7 @@ public final class HightouchMessages {
             _config = config
 
             #if canImport(CoreData) && (os(iOS) || os(macOS) || targetEnvironment(macCatalyst))
-            openStoreIfNeeded(analytics: analytics, config: config)
+            openStoreIfNeeded(analytics: analytics)
             // The launch sync runs after this lock is released; starting it inside would deadlock.
             configureMessagesForegroundSync(config: config)
             configureMessagesSyncCoordinator(analytics: analytics, config: config, store: _store)
@@ -79,8 +79,8 @@ public final class HightouchMessages {
     #if canImport(CoreData) && (os(iOS) || os(macOS) || targetEnvironment(macCatalyst))
     /// Keyed on the resolved store URL so repeated initialization never opens two stores over one
     /// SQLite file. Must be called on `stateQueue`.
-    private static func openStoreIfNeeded(analytics: Analytics, config: HightouchMessagesConfig) {
-        let writeKey = config.writeKeyOverride ?? analytics.writeKey
+    private static func openStoreIfNeeded(analytics: Analytics) {
+        let writeKey = analytics.writeKey
         let location = testStoreLocation ?? .appContainer
         let resolvedURL = try? MessageStoreLocation.storeURL(
             for: location, writeKey: writeKey, modelVersion: MessageStoreSchema.modelVersion

@@ -473,17 +473,6 @@ final class MessagesSync_Tests: XCTestCase {
         XCTAssertNil(request.url?.query)
     }
 
-    func testWriteKeyOverrideIsUsedForAuthorization() throws {
-        let analytics = makeAnalytics(writeKey: "\(name)-instance")
-        var config = HightouchMessagesConfig()
-        config.writeKeyOverride = "override-key"
-        let client = MessagesHTTPClient(analytics: analytics, config: config, protocolClasses: [StubMessagesURLProtocol.self])
-
-        let request = try fetch(with: client)
-        let basic = Data("override-key:".utf8).base64EncodedString()
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Basic \(basic)")
-    }
-
     func testRequestFactoryRunsAfterTheSDKHeaders() throws {
         let analytics = makeAnalytics(writeKey: "\(name)-factory")
         let client = MessagesHTTPClient(

@@ -39,7 +39,7 @@ final class MessagesHTTPClient {
         self.analytics = analytics
         self.host = config.messagesHost ?? MessagesHTTPClient.defaultHost
         self.path = config.messagesPath
-        self.writeKey = config.writeKeyOverride ?? analytics.writeKey
+        self.writeKey = analytics.writeKey
         self.requestFactory = requestFactory
         self.session = MessagesHTTPClient.configuredSession(protocolClasses: protocolClasses)
     }

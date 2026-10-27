@@ -27,9 +27,6 @@ public struct HightouchMessagesConfig {
     /// Maximum messages kept locally across all users; oldest-inserted are evicted first.
     public var maxStoredMessages: Int = 500
 
-    /// Overrides the write key used to authenticate fetches and key the local store.
-    public var writeKeyOverride: String?
-
     /// Applied last to every fetch request, e.g. to route through a proxy.
     public var requestFactory: ((URLRequest) -> URLRequest)?
 
