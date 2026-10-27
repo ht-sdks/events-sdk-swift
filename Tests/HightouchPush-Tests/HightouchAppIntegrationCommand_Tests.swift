@@ -150,6 +150,9 @@ final class HightouchAppIntegrationCommand_Tests: XCTestCase {
 
     func testCompletionFiresExactlyOnceWhenDeadlineRacesASlowSync() {
         initialize()
+        let output = OutputReaderPlugin()
+        HightouchPush.analytics.add(plugin: output)
+        waitUntilStarted(analytics: HightouchPush.analytics)
 
         let userInfo = hightouchUserInfo(command: ["verb": "syncMessages"])
         var results: [UIBackgroundFetchResult] = []
@@ -178,7 +181,17 @@ final class HightouchAppIntegrationCommand_Tests: XCTestCase {
         lock.lock()
         let finalResults = results
         lock.unlock()
-        XCTAssertEqual(finalResults, [.failed], "the deadline must win the race, and only once")
+        XCTAssertEqual(finalResults, [.noData], "the deadline must win the race, only once, and not report .failed")
+
+        // Let the slow sync's (ignored) completion drain through main.
+        let drained = expectation(description: "main drained")
+        DispatchQueue.main.async { drained.fulfill() }
+        wait(for: [drained], timeout: 2)
+        let delivered = output.events.compactMap { $0 as? TrackEvent }.filter {
+            $0.event == "CEP Engagement Events" && $0.properties?["provider_event_type"]?.stringValue == "delivered"
+        }
+        XCTAssertEqual(delivered.count, 1, "delivered is emitted once, by the deadline, ahead of its flush")
+        XCTAssertEqual(delivered.first?.properties?["message_count"]?.intValue, 0)
     }
 
     /// Built independently of MessagesISO8601 so the test isn't checking the implementation against itself.
