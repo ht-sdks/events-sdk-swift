@@ -124,7 +124,7 @@ final class MessagesGoldenPayload_Tests: XCTestCase {
 
     func testGoldenPayloadStoresAndIsQueryableByLocationAndVariant() throws {
         let response = try MessagesFetchResponse.parse(XCTUnwrap(goldenPayload.data(using: .utf8)))
-        let store = try MessageStore(writeKey: "\(name)-\(UUID().uuidString)", location: .ephemeral)
+        let store = try MessageStore(location: .ephemeral)
         let owner = MessageOwner(kind: .userId, id: "alice")
 
         let stored = expectation(description: "replaceAll")

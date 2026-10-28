@@ -20,7 +20,7 @@ final class MessagesTrackingStorage_Tests: XCTestCase {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("track-\(UUID().uuidString).sqlite")
         let owner = MessageOwner(kind: .userId, id: "alice")
-        let store = try MessageStore(writeKey: "seed-\(UUID().uuidString)", location: .explicit(url))
+        let store = try MessageStore(location: .explicit(url))
         let raw = try JSON([
             "messageId": id, "locationId": "home",
             "messageContext": ["campaignRunId": "run_1"],

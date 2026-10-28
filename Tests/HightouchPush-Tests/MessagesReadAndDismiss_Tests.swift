@@ -30,7 +30,7 @@ final class MessagesReadAndDismiss_Tests: XCTestCase {
 
     @discardableResult
     private func seed(_ messages: [HightouchMessage], owner: MessageOwner, at url: URL) throws -> MessageStore {
-        let store = try MessageStore(writeKey: "seed-\(UUID().uuidString)", location: .explicit(url))
+        let store = try MessageStore(location: .explicit(url))
         let done = expectation(description: "seed")
         var outcome: Result<UpsertOutcome, Error>?
         store.replaceAll(messages, owner: owner) { outcome = $0; done.fulfill() }
