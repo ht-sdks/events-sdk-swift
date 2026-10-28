@@ -153,7 +153,7 @@ final class HightouchMessagesActionsMessageContext_Tests: XCTestCase {
 
     @discardableResult
     private func seed(_ message: HightouchMessage, owner: MessageOwner, at url: URL) throws -> UpsertOutcome {
-        let store = try MessageStore(writeKey: "seed-\(UUID().uuidString)", location: .explicit(url))
+        let store = try MessageStore(location: .explicit(url))
         let seedExpectation = expectation(description: "seed replaceAll")
         var outcome: Result<UpsertOutcome, Error>?
         store.replaceAll([message], owner: owner) { result in

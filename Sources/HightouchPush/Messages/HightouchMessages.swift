@@ -86,9 +86,8 @@ public final class HightouchMessages {
     /// SQLite file. Must be called on `setupQueue`, which serializes it; the open itself runs
     /// outside `stateQueue` so queries aren't held up behind it.
     private static func openStoreIfNeeded(analytics: Analytics, location: MessageStore.Location) -> MessageStore? {
-        let writeKey = analytics.writeKey
         let resolvedURL = try? MessageStoreLocation.storeURL(
-            for: location, writeKey: writeKey, modelVersion: MessageStoreSchema.modelVersion
+            for: location, modelVersion: MessageStoreSchema.modelVersion
         )
 
         let (openStore, openURL) = stateQueue.sync { (_store, _storeURL) }
@@ -97,7 +96,7 @@ public final class HightouchMessages {
         }
 
         do {
-            let store = try MessageStore(writeKey: writeKey, location: location)
+            let store = try MessageStore(location: location)
             stateQueue.sync {
                 _store = store
                 _storeURL = resolvedURL

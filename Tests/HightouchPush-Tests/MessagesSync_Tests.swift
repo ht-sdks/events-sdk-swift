@@ -107,7 +107,7 @@ final class MessagesSync_Tests: XCTestCase {
     static let deviceToken = "0a1b2c3d4e5f"
 
     private func makeStore() throws -> MessageStore {
-        try MessageStore(writeKey: "\(name)-\(UUID().uuidString)", location: .ephemeral)
+        try MessageStore(location: .ephemeral)
     }
 
     private func makeAnalytics(writeKey: String, errorCounter: ErrorCounter? = nil) -> Analytics {

@@ -62,7 +62,7 @@ final class HightouchMessages_Facade_Tests: XCTestCase {
 
     @discardableResult
     private func seed(_ messages: [HightouchMessage], owner: MessageOwner, at url: URL) throws -> UpsertOutcome {
-        let store = try MessageStore(writeKey: "seed-\(UUID().uuidString)", location: .explicit(url))
+        let store = try MessageStore(location: .explicit(url))
         let seedExpectation = expectation(description: "seed replaceAll")
         var outcome: Result<UpsertOutcome, Error>?
         store.replaceAll(messages, owner: owner) { result in
@@ -74,8 +74,8 @@ final class HightouchMessages_Facade_Tests: XCTestCase {
     }
 
     @discardableResult
-    private func initializeFacade(at url: URL, userId: String, writeKey: String? = nil) -> Analytics {
-        let analytics = Analytics(configuration: Configuration(writeKey: writeKey ?? "\(name)-\(UUID().uuidString)"))
+    private func initializeFacade(at url: URL, userId: String) -> Analytics {
+        let analytics = Analytics(configuration: Configuration(writeKey: "\(name)-\(UUID().uuidString)"))
         analytics.identify(userId: userId)
         HightouchMessages.testStoreLocation = .explicit(url)
         HightouchMessages.initialize(analytics: analytics, config: HightouchMessagesConfig())
@@ -164,6 +164,25 @@ final class HightouchMessages_Facade_Tests: XCTestCase {
         )
     }
 
+    func testDifferentWriteKeysShareTheAppsOneStore() {
+        HightouchMessages.initialize(
+            analytics: Analytics(configuration: Configuration(writeKey: "\(name)-1")),
+            config: HightouchMessagesConfig()
+        )
+        let firstIdentity = HightouchMessages.openStoreIdentityForTesting
+        XCTAssertNotNil(firstIdentity)
+
+        HightouchMessages.initialize(
+            analytics: Analytics(configuration: Configuration(writeKey: "\(name)-2")),
+            config: HightouchMessagesConfig()
+        )
+
+        XCTAssertEqual(
+            firstIdentity, HightouchMessages.openStoreIdentityForTesting,
+            "the store is per app, not per write key"
+        )
+    }
+
     // MARK: - Owner scoping / privacy
 
     func testQueriesOnlyReturnRowsForTheCurrentlyIdentifiedOwner() throws {
@@ -183,7 +202,7 @@ final class HightouchMessages_Facade_Tests: XCTestCase {
         let visible = HightouchMessages.messages(matching: HightouchMessageQuery())
         XCTAssertEqual(visible.map { $0.messageId }, ["alice_msg"])
 
-        let bobStore = try MessageStore(writeKey: "bob-check-\(UUID().uuidString)", location: .explicit(url))
+        let bobStore = try MessageStore(location: .explicit(url))
         XCTAssertEqual(
             bobStore.messages(matching: HightouchMessageQuery(), owner: bob).map(\.messageId),
             ["bob_msg"]
