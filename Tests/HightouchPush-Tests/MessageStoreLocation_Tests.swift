@@ -3,46 +3,27 @@ import XCTest
 
 final class MessageStoreLocation_Tests: XCTestCase {
 
-    // MARK: - Write key sanitization
+    // MARK: - One directory per app
 
-    func testWriteKeysWithSlashAndPlusYieldOneDirectoryComponent() throws {
-        let slashy = "abc/def+ghi"
-        let safe = MessageStoreLocation.safeWriteKey(slashy)
+    func testMessagesDirectoryIsTheSameEveryTimeAndScopedToTheApp() throws {
+        let first = try MessageStoreLocation.messagesDirectory()
+        let second = try MessageStoreLocation.messagesDirectory()
+        XCTAssertEqual(first.standardizedFileURL, second.standardizedFileURL)
 
-        XCTAssertFalse(safe.contains("/"), "a percent-encoded write key must not reintroduce a path separator")
-
-        let directory = try MessageStoreLocation.messagesDirectory(writeKey: slashy)
-        let expectedParent = try MessageStoreLocation.messagesDirectory(writeKey: "placeholder").deletingLastPathComponent()
-
+        let components = Array(first.standardizedFileURL.pathComponents.suffix(3))
+        XCTAssertEqual(Array(components.suffix(2)), ["Hightouch", "Messages"])
+        #if os(macOS) || targetEnvironment(macCatalyst)
         XCTAssertEqual(
-            directory.deletingLastPathComponent().standardizedFileURL,
-            expectedParent.standardizedFileURL,
-            "the sanitized write key must contribute exactly one path component, not several"
+            components.first, Bundle.main.bundleIdentifier ?? "com.hightouch.sdk",
+            "an unsandboxed Mac app shares Application Support, so the bundle id must scope the store"
         )
-        XCTAssertEqual(directory.lastPathComponent, safe)
-    }
-
-    // MARK: - Distinct keys, distinct directories
-
-    func testDistinctWriteKeysYieldDistinctDirectories() throws {
-        let first = try MessageStoreLocation.messagesDirectory(writeKey: "\(name)-key-one")
-        let second = try MessageStoreLocation.messagesDirectory(writeKey: "\(name)-key-two")
-        XCTAssertNotEqual(first, second)
-    }
-
-    func testSameWriteKeyYieldsTheSameDirectoryEveryTime() throws {
-        let key = "\(name)-stable-key"
-        let first = try MessageStoreLocation.messagesDirectory(writeKey: key)
-        let second = try MessageStoreLocation.messagesDirectory(writeKey: key)
-
-        XCTAssertEqual(first.lastPathComponent, second.lastPathComponent)
-        XCTAssertEqual(first.deletingLastPathComponent().path, second.deletingLastPathComponent().path)
+        #endif
     }
 
     // MARK: - Backup exclusion
 
     func testMessagesDirectoryIsExcludedFromBackup() throws {
-        let directory = try MessageStoreLocation.messagesDirectory(writeKey: "\(name)-backup-check")
+        let directory = try MessageStoreLocation.messagesDirectory()
         let values = try directory.resourceValues(forKeys: [.isExcludedFromBackupKey])
         XCTAssertEqual(values.isExcludedFromBackup, true)
     }
@@ -59,8 +40,8 @@ final class MessageStoreLocation_Tests: XCTestCase {
     }
 
     func testAppContainerStoreURLEndsWithVersionedFilename() throws {
-        let url1 = try MessageStoreLocation.storeURL(for: .appContainer, writeKey: "\(name)-v1", modelVersion: 1)
-        let url2 = try MessageStoreLocation.storeURL(for: .appContainer, writeKey: "\(name)-v1", modelVersion: 2)
+        let url1 = try MessageStoreLocation.storeURL(for: .appContainer, modelVersion: 1)
+        let url2 = try MessageStoreLocation.storeURL(for: .appContainer, modelVersion: 2)
 
         XCTAssertEqual(url1?.lastPathComponent, "messages-v1.sqlite")
         XCTAssertEqual(url2?.lastPathComponent, "messages-v2.sqlite")
@@ -69,7 +50,7 @@ final class MessageStoreLocation_Tests: XCTestCase {
     // MARK: - .ephemeral has no directory to create
 
     func testEphemeralLocationResolvesToNil() throws {
-        let url = try MessageStoreLocation.storeURL(for: .ephemeral, writeKey: "\(name)-ephemeral", modelVersion: 1)
+        let url = try MessageStoreLocation.storeURL(for: .ephemeral, modelVersion: 1)
         XCTAssertNil(url)
     }
 
@@ -80,7 +61,7 @@ final class MessageStoreLocation_Tests: XCTestCase {
         let fileURL = directory.appendingPathComponent("custom.sqlite")
         defer { try? FileManager.default.removeItem(at: directory) }
 
-        let resolved = try MessageStoreLocation.storeURL(for: .explicit(fileURL), writeKey: "unused", modelVersion: 1)
+        let resolved = try MessageStoreLocation.storeURL(for: .explicit(fileURL), modelVersion: 1)
 
         XCTAssertEqual(resolved, fileURL)
         var isDirectory: ObjCBool = false

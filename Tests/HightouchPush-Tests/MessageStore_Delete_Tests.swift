@@ -10,7 +10,7 @@ import CoreData
 final class MessageStore_Delete_Tests: XCTestCase {
 
     private func makeStore() throws -> MessageStore {
-        try MessageStore(writeKey: "\(name)-\(UUID().uuidString)", location: .ephemeral)
+        try MessageStore(location: .ephemeral)
     }
 
     private func makeMessage(id: String) throws -> HightouchMessage {
