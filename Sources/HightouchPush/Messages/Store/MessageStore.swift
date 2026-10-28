@@ -3,7 +3,7 @@ import Foundation
 #if canImport(CoreData) && (os(iOS) || os(macOS) || targetEnvironment(macCatalyst))
 import CoreData
 
-/// The Core Data-backed local cache of messages for one write key.
+/// The Core Data-backed local cache of messages for this app, shared by every write key.
 final class MessageStore {
     typealias Location = MessageStoreLocation.Location
 
@@ -16,13 +16,13 @@ final class MessageStore {
     /// All reads, inside `performAndWait`.
     let readContext: NSManagedObjectContext
 
-    init(writeKey: String, location: Location, modelVersion: Int = MessageStoreSchema.modelVersion) throws {
+    init(location: Location, modelVersion: Int = MessageStoreSchema.modelVersion) throws {
         self.modelVersion = modelVersion
 
         let model = MessageStoreSchema.makeModel()
         let container = NSPersistentContainer(name: "HightouchMessages", managedObjectModel: model)
 
-        let storeURL = try MessageStore.resolveStoreURL(location: location, writeKey: writeKey, modelVersion: modelVersion)
+        let storeURL = try MessageStore.resolveStoreURL(location: location, modelVersion: modelVersion)
         let description = MessageStore.makeStoreDescription(url: storeURL)
         container.persistentStoreDescriptions = [description]
 
@@ -43,14 +43,14 @@ final class MessageStore {
         self.readContext = readContext
 
         if case .appContainer = location {
-            MessageStore.pruneOldModelVersions(writeKey: writeKey, currentVersion: modelVersion)
+            MessageStore.pruneOldModelVersions(currentVersion: modelVersion)
         }
     }
 
     // MARK: - Setup helpers
 
-    private static func resolveStoreURL(location: Location, writeKey: String, modelVersion: Int) throws -> URL {
-        if let url = try MessageStoreLocation.storeURL(for: location, writeKey: writeKey, modelVersion: modelVersion) {
+    private static func resolveStoreURL(location: Location, modelVersion: Int) throws -> URL {
+        if let url = try MessageStoreLocation.storeURL(for: location, modelVersion: modelVersion) {
             return url
         }
         // `.ephemeral`: SQLite at /dev/null, not NSInMemoryStoreType, which ignores uniqueness
@@ -101,8 +101,8 @@ final class MessageStore {
     }
 
     /// Deletes store files (and sidecars) left behind by older model versions.
-    private static func pruneOldModelVersions(writeKey: String, currentVersion: Int) {
-        guard let directory = try? MessageStoreLocation.messagesDirectory(writeKey: writeKey) else { return }
+    private static func pruneOldModelVersions(currentVersion: Int) {
+        guard let directory = try? MessageStoreLocation.messagesDirectory() else { return }
         guard let contents = try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) else { return }
 
         let currentPrefix = MessageStoreLocation.fileName(modelVersion: currentVersion)
