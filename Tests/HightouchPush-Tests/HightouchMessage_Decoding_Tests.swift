@@ -124,10 +124,10 @@ final class HightouchMessage_Decoding_Tests: XCTestCase {
 
     // MARK: - messageType
 
-    func testMessageTypeMissingDefaultsToEmptyString() throws {
+    func testMessageTypeMissingIsNil() throws {
         let raw = try makeJSON(#"{"messageId":"msg_1"}"#)
         let message = try HightouchMessage(raw: raw)
-        XCTAssertEqual(message.messageType, "")
+        XCTAssertNil(message.messageType)
     }
 
     // MARK: - content.elements ordering

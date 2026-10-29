@@ -5,8 +5,7 @@ import Hightouch
 /// server payload, so fields not modeled here survive a round trip.
 public struct HightouchMessage: Equatable {
     public let messageId: String
-    /// `""` when the server omits it.
-    public let messageType: String
+    public let messageType: String?
     public let campaignId: String?
     public let createdAt: Date?
     /// nil means the message never expires.
@@ -32,7 +31,7 @@ public struct HightouchMessage: Equatable {
         }
 
         self.messageId = messageId
-        self.messageType = raw["messageType"]?.stringValue ?? ""
+        self.messageType = raw["messageType"]?.stringValue
         self.campaignId = raw["campaignId"]?.stringValue
         self.createdAt = MessagesISO8601.date(from: raw["createdAt"])
         self.expiresAt = MessagesISO8601.date(from: raw["expiresAt"])
@@ -48,7 +47,7 @@ public struct HightouchMessage: Equatable {
 
     public init(
         messageId: String,
-        messageType: String = "",
+        messageType: String? = nil,
         campaignId: String? = nil,
         createdAt: Date? = nil,
         expiresAt: Date? = nil,
