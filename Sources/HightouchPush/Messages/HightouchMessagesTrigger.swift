@@ -4,6 +4,12 @@ import Foundation
 import UIKit
 import Hightouch
 
+/// A ghost-push command arrived, but `HightouchPushConfig.messages` isn't set. The server only
+/// sends commands for in-app campaigns linked to this app, so this is a configuration mismatch.
+struct MessagesNotEnabledError: Error {
+    let verb: String
+}
+
 /// Executes a ghost-push command and resolves the OS's `UIBackgroundFetchResult`.
 enum HightouchMessagesTrigger {
 
@@ -42,9 +48,10 @@ enum HightouchMessagesTrigger {
             return
         }
 
-        if !HightouchMessages.isInitialized {
-            print("[HightouchPush] '\(command.verb.rawValue)' command received, but embedded messages are not enabled, "
-                  + "so it will have no effect. Set HightouchPushConfig.messages before calling initialize().")
+        guard HightouchMessages.isInitialized else {
+            HightouchPush.analytics.reportInternalError(MessagesNotEnabledError(verb: command.verb.rawValue))
+            completionHandler(.noData)
+            return
         }
 
         // In the foreground there's no OS budget to protect, so skip the background task and flush.
@@ -64,17 +71,8 @@ enum HightouchMessagesTrigger {
             }
         }
 
-        // A push can carry both a command and customData; this path owns the single completion handler.
-        let customData = HTPushPayload(userInfo)?.customData
-
         Task {
             let (result, messageCount) = await execute(command: command, sync: sync)
-
-            if let customData = customData, !customData.isEmpty,
-               let delegate = HightouchPush.silentPushDelegate {
-                await delegate.receive(customData: customData)
-            }
-
             completion.complete(result, messageCount: messageCount)
         }
     }

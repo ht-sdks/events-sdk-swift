@@ -37,15 +37,26 @@ final class HightouchAppIntegrationCommand_Tests: XCTestCase {
 
     // MARK: - Fixtures
 
-    private func initialize(includeSilentPushDelegate: Bool = true) {
+    private func initialize(
+        includeSilentPushDelegate: Bool = true,
+        messagesEnabled: Bool = true,
+        errorHandler: ((Error) -> Void)? = nil
+    ) {
         var config = HightouchPushConfig(appId: "appintegration-test-app")
         if includeSilentPushDelegate {
             config.silentPushDelegate = silentPushDelegate
         }
-        HightouchPush.initialize(
-            configuration: Configuration(writeKey: "\(name)-appintegration"),
-            config: config
-        )
+        if messagesEnabled {
+            var messages = HightouchMessagesConfig()
+            messages.syncOnLaunch = false
+            config.messages = messages
+            HightouchMessages.testStoreLocation = .ephemeral
+        }
+        var configuration = Configuration(writeKey: "\(name)-appintegration")
+        if let errorHandler = errorHandler {
+            configuration = configuration.errorHandler(errorHandler)
+        }
+        HightouchPush.initialize(configuration: configuration, config: config)
     }
 
     private func hightouchUserInfo(
@@ -128,7 +139,7 @@ final class HightouchAppIntegrationCommand_Tests: XCTestCase {
         let userInfo = hightouchUserInfo(messageId: nil, command: ["verb": "syncMessages"])
         let results = driveApplication(userInfo)
 
-        XCTAssertEqual(results, [.noData], "messages isn't configured in this test, so the real sync no-ops")
+        XCTAssertEqual(results, [.noData], "there's no user id, so the real sync no-ops")
 
         let delivered = output.events.compactMap { $0 as? TrackEvent }.filter {
             $0.event == "CEP Engagement Events" && $0.properties?["provider_event_type"]?.stringValue == "delivered"
@@ -194,17 +205,23 @@ final class HightouchAppIntegrationCommand_Tests: XCTestCase {
         XCTAssertEqual(delivered.first?.properties?["message_count"]?.intValue, 0)
     }
 
-    /// Built independently of MessagesISO8601 so the test isn't checking the implementation against itself.
+    // MARK: - Messages not enabled
 
-    func testCommandAndCustomDataAreBothHandledWithOneCompletion() {
-        initialize()
+    func testCommandWithMessagesDisabledReportsAnErrorAndDoesNoWork() {
+        var reported: [Error] = []
+        initialize(messagesEnabled: false, errorHandler: { reported.append($0) })
+        let output = OutputReaderPlugin()
+        HightouchPush.analytics.add(plugin: output)
+        waitUntilStarted(analytics: HightouchPush.analytics)
 
-        let userInfo = hightouchUserInfo(command: ["verb": "syncMessages"], customData: ["foo": "bar"])
-        let results = driveApplication(userInfo)
+        let results = driveApplication(hightouchUserInfo(command: ["verb": "syncMessages"]))
 
-        XCTAssertEqual(results.count, 1)
-        XCTAssertEqual(silentPushDelegate.receiveCallCount, 1, "customData must still reach the delegate")
-        XCTAssertEqual(silentPushDelegate.lastCustomData, ["foo": "bar"])
+        XCTAssertEqual(results, [.noData])
+        XCTAssertEqual(reported.compactMap { ($0 as? MessagesNotEnabledError)?.verb }, ["syncMessages"])
+        let delivered = output.events.compactMap { $0 as? TrackEvent }.filter {
+            $0.properties?["provider_event_type"]?.stringValue == "delivered"
+        }
+        XCTAssertTrue(delivered.isEmpty, "a command for a feature the app hasn't enabled is not tracked")
     }
 
     // MARK: - Sync failure
