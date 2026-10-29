@@ -13,14 +13,11 @@ final class HTMessageEntity: NSManagedObject {
     @NSManaged var campaignId: String?
     @NSManaged var createdAt: Date?
     @NSManaged var expiresAt: Date?
-    @NSManaged var priority: String?
     @NSManaged var priorityRank: Int32
     @NSManaged var locationId: String?
     @NSManaged var variantSlug: String?
-    @NSManaged var triggerType: String?
     @NSManaged var messageVersion: String?
     @NSManaged var payload: Data
     @NSManaged var insertedAt: Date
-    @NSManaged var updatedAt: Date
 }
 #endif

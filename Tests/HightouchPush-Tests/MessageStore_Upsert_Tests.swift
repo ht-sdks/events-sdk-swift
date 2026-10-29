@@ -75,7 +75,6 @@ final class MessageStore_Upsert_Tests: XCTestCase {
 
     private struct RowSnapshot {
         let insertedAt: Date
-        let updatedAt: Date
         let payload: Data
     }
 
@@ -89,7 +88,7 @@ final class MessageStore_Upsert_Tests: XCTestCase {
                 MessageStoreSchema.Attr.messageId.rawValue, id
             )
             if let entity = try? store.readContext.fetch(fetch).first {
-                result = RowSnapshot(insertedAt: entity.insertedAt, updatedAt: entity.updatedAt, payload: entity.payload)
+                result = RowSnapshot(insertedAt: entity.insertedAt, payload: entity.payload)
             }
         }
         return result
@@ -106,7 +105,7 @@ final class MessageStore_Upsert_Tests: XCTestCase {
 
     // MARK: - Insert / update / unchanged
 
-    func testChangedContentAdvancesUpdatedAtButKeepsInsertedAt() throws {
+    func testChangedContentRewritesPayloadButKeepsInsertedAt() throws {
         let store = try makeStore()
         let owner = MessageOwner(kind: .userId, id: "alice")
         let t0 = Date(timeIntervalSince1970: 1_700_000_000)
@@ -115,7 +114,6 @@ final class MessageStore_Upsert_Tests: XCTestCase {
         try replaceAllSync(store, [try makeMessage(id: "m1", campaignId: "camp_1")], owner: owner, now: t0)
         let firstSnapshot = try XCTUnwrap(snapshot(store, id: "m1", owner: owner))
         XCTAssertEqual(firstSnapshot.insertedAt, t0)
-        XCTAssertEqual(firstSnapshot.updatedAt, t0)
 
         let outcome = try replaceAllSync(store, [try makeMessage(id: "m1", campaignId: "camp_2")], owner: owner, now: t1)
         XCTAssertEqual(outcome.updatedIds, ["m1"])
@@ -123,10 +121,10 @@ final class MessageStore_Upsert_Tests: XCTestCase {
 
         let secondSnapshot = try XCTUnwrap(snapshot(store, id: "m1", owner: owner))
         XCTAssertEqual(secondSnapshot.insertedAt, t0, "insertedAt must not move on an update")
-        XCTAssertEqual(secondSnapshot.updatedAt, t1, "updatedAt must advance on real content change")
+        XCTAssertNotEqual(secondSnapshot.payload, firstSnapshot.payload, "payload must be rewritten on real content change")
     }
 
-    func testByteIdenticalReUpsertReportsUnchangedAndDoesNotAdvanceUpdatedAt() throws {
+    func testByteIdenticalReUpsertReportsUnchangedAndKeepsTheRow() throws {
         let store = try makeStore()
         let owner = MessageOwner(kind: .userId, id: "alice")
         let t0 = Date(timeIntervalSince1970: 1_700_000_000)
@@ -134,6 +132,7 @@ final class MessageStore_Upsert_Tests: XCTestCase {
         let message = try makeMessage(id: "m1", campaignId: "camp_1")
 
         try replaceAllSync(store, [message], owner: owner, now: t0)
+        let beforeSnapshot = try XCTUnwrap(snapshot(store, id: "m1", owner: owner))
         let outcome = try replaceAllSync(store, [message], owner: owner, now: t1)
 
         XCTAssertEqual(outcome.unchanged, 1)
@@ -141,7 +140,8 @@ final class MessageStore_Upsert_Tests: XCTestCase {
         XCTAssertTrue(outcome.insertedIds.isEmpty)
 
         let afterSnapshot = try XCTUnwrap(snapshot(store, id: "m1", owner: owner))
-        XCTAssertEqual(afterSnapshot.updatedAt, t0, "resubmitting the same message must not advance updatedAt")
+        XCTAssertEqual(afterSnapshot.insertedAt, beforeSnapshot.insertedAt)
+        XCTAssertEqual(afterSnapshot.payload, beforeSnapshot.payload)
     }
 
     // Fired while the write is likely still in flight; only asserts each read sees a consistent snapshot.
@@ -156,13 +156,14 @@ final class MessageStore_Upsert_Tests: XCTestCase {
         XCTAssertEqual(firstOrder, secondOrder, "precondition: these two values must be semantically equal")
 
         try replaceAllSync(store, [firstOrder], owner: owner, now: t0)
+        let beforeSnapshot = try XCTUnwrap(snapshot(store, id: "m1", owner: owner))
         let outcome = try replaceAllSync(store, [secondOrder], owner: owner, now: t1)
 
         XCTAssertEqual(outcome.unchanged, 1)
         XCTAssertTrue(outcome.updatedIds.isEmpty)
 
         let afterSnapshot = try XCTUnwrap(snapshot(store, id: "m1", owner: owner))
-        XCTAssertEqual(afterSnapshot.updatedAt, t0)
+        XCTAssertEqual(afterSnapshot.payload, beforeSnapshot.payload)
     }
 
     func testDuplicateIdsInOneInputLastWins() throws {
@@ -236,7 +237,6 @@ final class MessageStore_Upsert_Tests: XCTestCase {
             first.priorityRank = 1
             first.payload = Data([0x01])
             first.insertedAt = now
-            first.updatedAt = now
 
             let second = Self.makeBareEntity(in: store.writeContext)
             second.messageId = "dup"
@@ -244,7 +244,6 @@ final class MessageStore_Upsert_Tests: XCTestCase {
             second.priorityRank = 2
             second.payload = Data([0x02])
             second.insertedAt = now
-            second.updatedAt = now
 
             do {
                 try store.writeContext.save()

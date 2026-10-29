@@ -207,14 +207,11 @@ extension MessageStore {
         entity.campaignId = message.campaignId
         entity.createdAt = message.createdAt
         entity.expiresAt = message.expiresAt
-        entity.priority = message.priority.rawValue
         entity.priorityRank = message.priorityRank
         entity.locationId = message.locationId
         entity.variantSlug = message.variantSlug
-        entity.triggerType = message.triggerType
         entity.messageVersion = message.version
         entity.payload = payload
-        entity.updatedAt = now
         if isNew {
             entity.insertedAt = now
         }
