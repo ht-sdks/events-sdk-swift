@@ -303,8 +303,8 @@ This version string is used in:
 > xcodebuild test -scheme Hightouch-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
 > ```
 >
-> Current baselines: `swift test` = **340 tests**; simulator = **369 tests** (93 `Hightouch-Tests`
-> + 57 `HightouchBraze-Tests` + 219 `HightouchPush-Tests`), 0 failures. Check `xcrun simctl list devices available` if that
+> Current baselines: `swift test` = **343 tests**; simulator = **372 tests** (92 `Hightouch-Tests`
+> + 57 `HightouchBraze-Tests` + 223 `HightouchPush-Tests`), 0 failures. Check `xcrun simctl list devices available` if that
 > device name has aged out.
 
 - **`OutputReaderPlugin`**: An `.after` plugin that captures the last event for assertions. Defined in `Tests/Hightouch-Tests/Support/TestUtilities.swift`.
