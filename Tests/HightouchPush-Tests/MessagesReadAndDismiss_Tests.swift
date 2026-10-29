@@ -22,10 +22,9 @@ final class MessagesReadAndDismiss_Tests: XCTestCase {
             .appendingPathComponent("read-dismiss-\(UUID().uuidString).sqlite")
     }
 
-    private func makeMessage(id: String, locationId: String? = "home") throws -> HightouchMessage {
-        var dict: [String: Any] = ["messageId": id]
-        if let locationId = locationId { dict["locationId"] = locationId }
-        return try HightouchMessage(raw: try JSON(dict))
+    /// In the "home" location these tests read from.
+    private func makeHomeMessage(id: String) throws -> HightouchMessage {
+        try makeMessage(id: id, locationId: "home")
     }
 
     @discardableResult
@@ -61,7 +60,7 @@ final class MessagesReadAndDismiss_Tests: XCTestCase {
     func testRepeatedReadsReturnTheSameMessages() throws {
         let url = tempStoreURL()
         let owner = MessageOwner(kind: .userId, id: "alice")
-        try seed([try makeMessage(id: "m1"), try makeMessage(id: "m2")], owner: owner, at: url)
+        try seed([try makeHomeMessage(id: "m1"), try makeHomeMessage(id: "m2")], owner: owner, at: url)
         initializeFacade(at: url, userId: "alice")
 
         XCTAssertEqual(HightouchMessages.messages(locationId: "home").map(\.messageId).sorted(), ["m1", "m2"])
@@ -74,7 +73,7 @@ final class MessagesReadAndDismiss_Tests: XCTestCase {
     func testMessageWithIdIsRepeatable() throws {
         let url = tempStoreURL()
         let owner = MessageOwner(kind: .userId, id: "alice")
-        try seed([try makeMessage(id: "m1")], owner: owner, at: url)
+        try seed([try makeHomeMessage(id: "m1")], owner: owner, at: url)
         initializeFacade(at: url, userId: "alice")
 
         XCTAssertEqual(HightouchMessages.message(withId: "m1")?.messageId, "m1")
@@ -87,7 +86,7 @@ final class MessagesReadAndDismiss_Tests: XCTestCase {
     func testLoadMessagesDoesNotRemove() throws {
         let url = tempStoreURL()
         let owner = MessageOwner(kind: .userId, id: "alice")
-        try seed([try makeMessage(id: "m1")], owner: owner, at: url)
+        try seed([try makeHomeMessage(id: "m1")], owner: owner, at: url)
         initializeFacade(at: url, userId: "alice")
 
         let loaded = expectation(description: "loaded")
@@ -107,7 +106,7 @@ final class MessagesReadAndDismiss_Tests: XCTestCase {
     func testAReadMessageSurvivesASync() throws {
         let url = tempStoreURL()
         let owner = MessageOwner(kind: .userId, id: "alice")
-        let store = try seed([try makeMessage(id: "m1")], owner: owner, at: url)
+        let store = try seed([try makeHomeMessage(id: "m1")], owner: owner, at: url)
         initializeFacade(at: url, userId: "alice")
 
         _ = HightouchMessages.messages(locationId: "home")
@@ -115,7 +114,7 @@ final class MessagesReadAndDismiss_Tests: XCTestCase {
 
         let resynced = expectation(description: "resync")
         store.replaceAll(
-            [try makeMessage(id: "m1")],
+            [try makeHomeMessage(id: "m1")],
             owner: owner,
             suppressing: { HightouchMessages.dismissedIds(owner: owner) }
         ) { _ in resynced.fulfill() }
@@ -129,7 +128,7 @@ final class MessagesReadAndDismiss_Tests: XCTestCase {
     func testDismissDeletesLogsAndASyncDoesNotReinsert() throws {
         let url = tempStoreURL()
         let owner = MessageOwner(kind: .userId, id: "alice")
-        let store = try seed([try makeMessage(id: "m1"), try makeMessage(id: "m2")], owner: owner, at: url)
+        let store = try seed([try makeHomeMessage(id: "m1"), try makeHomeMessage(id: "m2")], owner: owner, at: url)
         initializeFacade(at: url, userId: "alice")
 
         let removed = expectation(forNotification: .hightouchMessagesDidChange, object: nil) { note in
@@ -144,7 +143,7 @@ final class MessagesReadAndDismiss_Tests: XCTestCase {
 
         let resynced = expectation(description: "resync")
         store.replaceAll(
-            [try makeMessage(id: "m1"), try makeMessage(id: "m2")],
+            [try makeHomeMessage(id: "m1"), try makeHomeMessage(id: "m2")],
             owner: owner,
             suppressing: { HightouchMessages.dismissedIds(owner: owner) }
         ) { _ in resynced.fulfill() }
@@ -157,7 +156,7 @@ final class MessagesReadAndDismiss_Tests: XCTestCase {
     func testWithoutSuppressionASyncDoesResurrectIt() throws {
         let url = tempStoreURL()
         let owner = MessageOwner(kind: .userId, id: "alice")
-        let store = try seed([try makeMessage(id: "m1")], owner: owner, at: url)
+        let store = try seed([try makeHomeMessage(id: "m1")], owner: owner, at: url)
 
         let deleted = expectation(description: "delete")
         store.delete(messageId: "m1", owner: owner) { _ in deleted.fulfill() }
@@ -165,7 +164,7 @@ final class MessagesReadAndDismiss_Tests: XCTestCase {
         XCTAssertEqual(store.messages(matching: HightouchMessageQuery(), owner: owner).count, 0)
 
         let resynced = expectation(description: "resync")
-        store.replaceAll([try makeMessage(id: "m1")], owner: owner) { _ in resynced.fulfill() }
+        store.replaceAll([try makeHomeMessage(id: "m1")], owner: owner) { _ in resynced.fulfill() }
         wait(for: [resynced], timeout: 5)
 
         XCTAssertEqual(
@@ -183,7 +182,7 @@ final class MessagesReadAndDismiss_Tests: XCTestCase {
         let expired = try HightouchMessage(raw: try JSON([
             "messageId": "old", "locationId": "home", "expiresAt": "2000-01-01T00:00:00Z",
         ]))
-        let store = try seed([expired, try makeMessage(id: "fresh")], owner: owner, at: url)
+        let store = try seed([expired, try makeHomeMessage(id: "fresh")], owner: owner, at: url)
         initializeFacade(at: url, userId: "alice")
 
         XCTAssertEqual(HightouchMessages.messages(locationId: "home").map(\.messageId), ["fresh"])
@@ -203,7 +202,7 @@ final class MessagesReadAndDismiss_Tests: XCTestCase {
     func testClearRemovesEveryCachedMessageForTheCurrentIdentity() throws {
         let url = tempStoreURL()
         let owner = MessageOwner(kind: .userId, id: "alice")
-        try seed([try makeMessage(id: "m1"), try makeMessage(id: "m2")], owner: owner, at: url)
+        try seed([try makeHomeMessage(id: "m1"), try makeHomeMessage(id: "m2")], owner: owner, at: url)
         initializeFacade(at: url, userId: "alice")
 
         XCTAssertEqual(HightouchMessages.messageCount(matching: HightouchMessageQuery()), 2)
@@ -220,7 +219,7 @@ final class MessagesReadAndDismiss_Tests: XCTestCase {
     func testClearForgetsDismissalsSoAResyncRepopulates() throws {
         let url = tempStoreURL()
         let owner = MessageOwner(kind: .userId, id: "alice")
-        let store = try seed([try makeMessage(id: "m1")], owner: owner, at: url)
+        let store = try seed([try makeHomeMessage(id: "m1")], owner: owner, at: url)
         initializeFacade(at: url, userId: "alice")
 
         HightouchMessages.removeDismissed(messageId: "m1")
@@ -235,7 +234,7 @@ final class MessagesReadAndDismiss_Tests: XCTestCase {
 
         let resynced = expectation(description: "resync")
         store.replaceAll(
-            [try makeMessage(id: "m1")],
+            [try makeHomeMessage(id: "m1")],
             owner: owner,
             suppressing: { HightouchMessages.dismissedIds(owner: owner) }
         ) { _ in resynced.fulfill() }
@@ -252,8 +251,8 @@ final class MessagesReadAndDismiss_Tests: XCTestCase {
         let url = tempStoreURL()
         let alice = MessageOwner(kind: .userId, id: "alice")
         let bob = MessageOwner(kind: .userId, id: "bob")
-        try seed([try makeMessage(id: "alice_msg")], owner: alice, at: url)
-        let store = try seed([try makeMessage(id: "bob_msg")], owner: bob, at: url)
+        try seed([try makeHomeMessage(id: "alice_msg")], owner: alice, at: url)
+        let store = try seed([try makeHomeMessage(id: "bob_msg")], owner: bob, at: url)
         initializeFacade(at: url, userId: "alice")
 
         let cleared = expectation(description: "cleared")

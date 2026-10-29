@@ -106,10 +106,6 @@ final class MessagesSync_Tests: XCTestCase {
 
     static let deviceToken = "0a1b2c3d4e5f"
 
-    private func makeStore() throws -> MessageStore {
-        try MessageStore(location: .ephemeral)
-    }
-
     private func makeAnalytics(writeKey: String, errorCounter: ErrorCounter? = nil) -> Analytics {
         var configuration = Configuration(writeKey: writeKey)
         if let errorCounter = errorCounter {
@@ -544,7 +540,6 @@ final class MessagesSync_Tests: XCTestCase {
         return try XCTUnwrap(StubMessagesURLProtocol.capturedRequests.last)
     }
 
-    // MARK: - versionHash snapshot
     func testDefaultRequestIsAGetToTheGatewayPath() throws {
         let analytics = makeAnalytics(writeKey: "\(name)-default")
         let client = MessagesHTTPClient(analytics: analytics, config: HightouchMessagesConfig(), protocolClasses: [StubMessagesURLProtocol.self])
@@ -555,7 +550,6 @@ final class MessagesSync_Tests: XCTestCase {
         XCTAssertNil(StubMessagesURLProtocol.capturedBodies.last ?? nil, "a GET must carry no body")
     }
 
-    /// Stands in for Xcode's model diff. Recompute deliberately on a real schema change and bump modelVersion.
     func testCredentialsAndIdentityTravelInGatewayHeaders() throws {
         let writeKey = "wk-secret-\(UUID().uuidString)"
         let analytics = makeAnalytics(writeKey: writeKey)

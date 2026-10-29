@@ -53,13 +53,6 @@ final class HightouchMessages_Facade_Tests: XCTestCase {
         FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).sqlite")
     }
 
-    private func makeMessage(id: String, locationId: String? = nil, variantSlug: String? = nil) throws -> HightouchMessage {
-        var dict: [String: Any] = ["messageId": id]
-        if let locationId = locationId { dict["locationId"] = locationId }
-        if let variantSlug = variantSlug { dict["variantSlug"] = variantSlug }
-        return try HightouchMessage(raw: try JSON(dict))
-    }
-
     @discardableResult
     private func seed(_ messages: [HightouchMessage], owner: MessageOwner, at url: URL) throws -> UpsertOutcome {
         let store = try MessageStore(location: .explicit(url))
