@@ -16,11 +16,11 @@ struct MessageOwner: Equatable {
     }
 
     static func current(analytics: Analytics) -> MessageOwner? {
-        if let userId = analytics.userId?.trimmingCharacters(in: .whitespacesAndNewlines), !userId.isEmpty {
+        if let userId = analytics.userId, !userId.isEmpty {
             return MessageOwner(kind: .userId, id: userId)
         }
 
-        let anonymousId = analytics.anonymousId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let anonymousId = analytics.anonymousId
         if !anonymousId.isEmpty {
             return MessageOwner(kind: .anonymousId, id: anonymousId)
         }

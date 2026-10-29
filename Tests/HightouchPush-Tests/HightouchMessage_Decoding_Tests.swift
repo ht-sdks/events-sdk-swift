@@ -206,6 +206,14 @@ final class HightouchMessage_Decoding_Tests: XCTestCase {
         XCTAssertEqual(MessageOwner.current(analytics: analytics), MessageOwner(kind: .userId, id: "alice"))
     }
 
+    /// The owner id is sent to the server as-is, so it must match the `userId` events carry.
+    func testMessageOwnerCurrentKeepsUserIdVerbatim() {
+        let analytics = Analytics(configuration: Configuration(writeKey: "\(name)-owner-verbatim"))
+        analytics.identify(userId: " alice ")
+
+        XCTAssertEqual(MessageOwner.current(analytics: analytics), MessageOwner(kind: .userId, id: " alice "))
+    }
+
     func testMessageOwnerCurrentFallsBackToAnonymousId() {
         let analytics = Analytics(configuration: Configuration(writeKey: "\(name)-owner-anon"))
 
