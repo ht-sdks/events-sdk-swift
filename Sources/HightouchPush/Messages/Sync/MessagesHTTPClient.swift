@@ -33,14 +33,13 @@ final class MessagesHTTPClient {
     init(
         analytics: Analytics,
         config: HightouchMessagesConfig,
-        protocolClasses: [AnyClass]? = nil,
-        requestFactory: ((URLRequest) -> URLRequest)? = nil
+        protocolClasses: [AnyClass]? = nil
     ) {
         self.analytics = analytics
         self.host = config.messagesHost ?? MessagesHTTPClient.defaultHost
         self.path = config.messagesPath
         self.writeKey = analytics.writeKey
-        self.requestFactory = requestFactory
+        self.requestFactory = config.requestFactory
         self.session = MessagesHTTPClient.configuredSession(protocolClasses: protocolClasses)
     }
 
