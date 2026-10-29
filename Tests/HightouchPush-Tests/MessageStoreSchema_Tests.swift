@@ -119,8 +119,8 @@ final class MessageStoreSchema_Tests: XCTestCase {
         XCTAssertTrue(resolved === HTMessageEntity.self)
     }
 
-    /// Pins the real backend response body. A wrong envelope or an empty messageId fails silently on device.
-
+    /// Stands in for Xcode's model diff. Recompute deliberately on a real schema change, and bump
+    /// `MessageStoreSchema.modelVersion` if lightweight migration can't infer it.
     func testEntityVersionHashSnapshot() {
         let hash = MessageStoreSchema.makeModel().entityVersionHashesByName[MessageStoreSchema.entityName]
         XCTAssertEqual(hash?.base64EncodedString(), MessageStoreSchema_Tests.expectedVersionHashBase64)
