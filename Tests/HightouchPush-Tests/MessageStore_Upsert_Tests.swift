@@ -9,56 +9,12 @@ final class MessageStore_Upsert_Tests: XCTestCase {
 
     // MARK: - Fixtures
 
-    private func makeStore() throws -> MessageStore {
-        try MessageStore(location: .ephemeral)
-    }
-
     private static func makeBareEntity(in context: NSManagedObjectContext) -> HTMessageEntity {
         NSEntityDescription.insertNewObject(forEntityName: MessageStoreSchema.entityName, into: context) as! HTMessageEntity
     }
 
     private func makeJSON(_ jsonString: String) throws -> JSON {
         try JSONDecoder().decode(JSON.self, from: Data(jsonString.utf8))
-    }
-
-    private func makeMessage(
-        id: String,
-        campaignId: String? = nil,
-        locationId: String? = nil,
-        variantSlug: String? = nil,
-        priority: String? = nil,
-        createdAt: Date? = nil,
-        expiresAt: Date? = nil
-    ) throws -> HightouchMessage {
-        var dict: [String: Any] = ["messageId": id]
-        if let campaignId = campaignId { dict["campaignId"] = campaignId }
-        if let locationId = locationId { dict["locationId"] = locationId }
-        if let variantSlug = variantSlug { dict["variantSlug"] = variantSlug }
-        if let priority = priority { dict["priority"] = priority }
-        let formatter = ISO8601DateFormatter()
-        if let createdAt = createdAt { dict["createdAt"] = formatter.string(from: createdAt) }
-        if let expiresAt = expiresAt { dict["expiresAt"] = formatter.string(from: expiresAt) }
-        let raw = try JSON(dict)
-        return try HightouchMessage(raw: raw)
-    }
-
-    /// Duplicated from Hightouch-Tests' `checkIfLeaked`: SPM test targets can't depend on one another.
-    @discardableResult
-    private func replaceAllSync(
-        _ store: MessageStore,
-        _ messages: [HightouchMessage],
-        owner: MessageOwner,
-        limit: Int? = nil,
-        now: Date = Date()
-    ) throws -> UpsertOutcome {
-        let expectation = expectation(description: "replaceAll")
-        var outcome: Result<UpsertOutcome, Error>?
-        store.replaceAll(messages, owner: owner, limit: limit, now: now) { result in
-            outcome = result
-            expectation.fulfill()
-        }
-        wait(for: [expectation], timeout: 5)
-        return try XCTUnwrap(outcome).get()
     }
 
     @discardableResult
@@ -92,15 +48,6 @@ final class MessageStore_Upsert_Tests: XCTestCase {
             }
         }
         return result
-    }
-
-    private func totalRowCount(_ store: MessageStore) -> Int {
-        var count = 0
-        store.readContext.performAndWait {
-            let fetch = NSFetchRequest<HTMessageEntity>(entityName: MessageStoreSchema.entityName)
-            count = (try? store.readContext.count(for: fetch)) ?? 0
-        }
-        return count
     }
 
     // MARK: - Insert / update / unchanged

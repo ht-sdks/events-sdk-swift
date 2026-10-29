@@ -9,30 +9,6 @@ import CoreData
 /// globally registered ones, so this intercepts only this client's traffic.
 final class MessageStore_Delete_Tests: XCTestCase {
 
-    private func makeStore() throws -> MessageStore {
-        try MessageStore(location: .ephemeral)
-    }
-
-    private func makeMessage(id: String) throws -> HightouchMessage {
-        try HightouchMessage(raw: try JSON(["messageId": id]))
-    }
-
-    @discardableResult
-    private func replaceAllSync(
-        _ store: MessageStore,
-        _ messages: [HightouchMessage],
-        owner: MessageOwner
-    ) throws -> UpsertOutcome {
-        let done = expectation(description: "replaceAll")
-        var outcome: Result<UpsertOutcome, Error>?
-        store.replaceAll(messages, owner: owner) { result in
-            outcome = result
-            done.fulfill()
-        }
-        wait(for: [done], timeout: 5)
-        return try XCTUnwrap(outcome).get()
-    }
-
     @discardableResult
     private func deleteSync(_ store: MessageStore, messageId: String, owner: MessageOwner) -> Int {
         let done = expectation(description: "delete")

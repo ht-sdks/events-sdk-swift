@@ -7,36 +7,6 @@ import CoreData
 
 final class MessageStore_Expiry_Tests: XCTestCase {
 
-    private func makeStore() throws -> MessageStore {
-        try MessageStore(location: .ephemeral)
-    }
-
-    private func makeMessage(id: String, expiresAt: Date? = nil) throws -> HightouchMessage {
-        var dict: [String: Any] = ["messageId": id]
-        if let expiresAt = expiresAt {
-            dict["expiresAt"] = ISO8601DateFormatter().string(from: expiresAt)
-        }
-        let raw = try JSON(dict)
-        return try HightouchMessage(raw: raw)
-    }
-
-    @discardableResult
-    private func replaceAllSync(
-        _ store: MessageStore,
-        _ messages: [HightouchMessage],
-        owner: MessageOwner,
-        now: Date = Date()
-    ) throws -> UpsertOutcome {
-        let expectation = expectation(description: "replaceAll")
-        var outcome: Result<UpsertOutcome, Error>?
-        store.replaceAll(messages, owner: owner, now: now) { result in
-            outcome = result
-            expectation.fulfill()
-        }
-        wait(for: [expectation], timeout: 5)
-        return try XCTUnwrap(outcome).get()
-    }
-
     private func pruneSync(_ store: MessageStore, asOf now: Date) -> Int {
         let expectation = expectation(description: "pruneExpired")
         var pruned = 0
@@ -46,15 +16,6 @@ final class MessageStore_Expiry_Tests: XCTestCase {
         }
         wait(for: [expectation], timeout: 5)
         return pruned
-    }
-
-    private func totalRowCount(_ store: MessageStore) -> Int {
-        var count = 0
-        store.readContext.performAndWait {
-            let fetch = NSFetchRequest<HTMessageEntity>(entityName: MessageStoreSchema.entityName)
-            count = (try? store.readContext.count(for: fetch)) ?? 0
-        }
-        return count
     }
 
     // MARK: - Query-time filtering
