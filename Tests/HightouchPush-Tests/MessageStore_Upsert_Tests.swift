@@ -337,14 +337,14 @@ final class MessageStore_Upsert_Tests: XCTestCase {
         let store = try makeStore()
         let owner = MessageOwner(kind: .userId, id: "alice")
         let base = Date(timeIntervalSince1970: 1_700_000_000)
-        let oldNormal = try makeMessage(id: "old_normal", createdAt: base)
-        let newNormal = try makeMessage(id: "new_normal", createdAt: base.addingTimeInterval(10))
+        let oldDefault = try makeMessage(id: "old_default", createdAt: base)
+        let newDefault = try makeMessage(id: "new_default", createdAt: base.addingTimeInterval(10))
         let oldHigh = try makeMessage(id: "old_high", priority: "high", createdAt: base)
         let undated = try makeMessage(id: "undated")
 
-        let outcome = try replaceAllSync(store, [oldNormal, undated, newNormal, oldHigh], owner: owner, limit: 2)
+        let outcome = try replaceAllSync(store, [oldDefault, undated, newDefault, oldHigh], owner: owner, limit: 2)
 
-        XCTAssertEqual(Set(outcome.insertedIds), ["old_high", "new_normal"])
+        XCTAssertEqual(Set(outcome.insertedIds), ["old_high", "new_default"])
         XCTAssertEqual(totalRowCount(store), 2)
     }
 

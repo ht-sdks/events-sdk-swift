@@ -110,23 +110,24 @@ final class MessageStore_Query_Tests: XCTestCase {
         let base = Date(timeIntervalSince1970: 1_700_000_000)
 
         try replaceAllSync(store, try [
-            makeMessage(id: "low_old", priority: "300", createdAt: base),
-            makeMessage(id: "low_new", priority: "300", createdAt: base.addingTimeInterval(100)),
-            makeMessage(id: "high_old", priority: "0", createdAt: base),
-            makeMessage(id: "high_new", priority: "0", createdAt: base.addingTimeInterval(100))
+            makeMessage(id: "low_old", priority: "low", createdAt: base),
+            makeMessage(id: "low_new", priority: "low", createdAt: base.addingTimeInterval(100)),
+            makeMessage(id: "high_old", priority: "high", createdAt: base),
+            makeMessage(id: "high_new", priority: "high", createdAt: base.addingTimeInterval(100)),
+            makeMessage(id: "default_newest", createdAt: base.addingTimeInterval(200))
         ], owner: owner)
 
         let ordered = store.messages(matching: HightouchMessageQuery(sort: .priorityThenNewest), owner: owner)
-        XCTAssertEqual(ordered.map { $0.messageId }, ["high_new", "high_old", "low_new", "low_old"])
+        XCTAssertEqual(ordered.map { $0.messageId }, ["high_new", "high_old", "low_new", "low_old", "default_newest"])
 
         let oldestFirst = store.messages(matching: HightouchMessageQuery(sort: .priorityThenOldest), owner: owner)
-        XCTAssertEqual(oldestFirst.map { $0.messageId }, ["high_old", "high_new", "low_old", "low_new"])
+        XCTAssertEqual(oldestFirst.map { $0.messageId }, ["high_old", "high_new", "low_old", "low_new", "default_newest"])
 
         let newest = store.messages(matching: HightouchMessageQuery(sort: .newestFirst), owner: owner)
-        XCTAssertEqual(newest.map { $0.messageId }, ["high_new", "low_new", "high_old", "low_old"])
+        XCTAssertEqual(newest.map { $0.messageId }, ["default_newest", "high_new", "low_new", "high_old", "low_old"])
 
         let oldest = store.messages(matching: HightouchMessageQuery(sort: .oldestFirst), owner: owner)
-        XCTAssertEqual(oldest.map { $0.messageId }, ["high_old", "low_old", "high_new", "low_new"])
+        XCTAssertEqual(oldest.map { $0.messageId }, ["high_old", "low_old", "high_new", "low_new", "default_newest"])
     }
 
     // MARK: - Total-order stability
@@ -136,8 +137,7 @@ final class MessageStore_Query_Tests: XCTestCase {
         let owner = MessageOwner(kind: .userId, id: "alice")
         let sameInstant = Date(timeIntervalSince1970: 1_700_000_000)
 
-        // The provider runs on the coordinator's queue, so key the switch to call order, not the test's timeline.
-        let messages = try (0..<10).map { try makeMessage(id: "m\($0)", priority: "100", createdAt: sameInstant) }
+        let messages = try (0..<10).map { try makeMessage(id: "m\($0)", priority: "medium", createdAt: sameInstant) }
         try replaceAllSync(store, messages, owner: owner)
 
         let expectedOrder = (0..<10).map { "m\($0)" }.sorted()
