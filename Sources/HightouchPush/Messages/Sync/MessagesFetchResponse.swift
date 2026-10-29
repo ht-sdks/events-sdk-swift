@@ -14,7 +14,6 @@ struct MissingMessagesArrayError: Error {}
 /// `replaceAll` deletes anything it omits, so a paged response would lose data.
 struct MessagesFetchResponse {
     let messages: [HightouchMessage]
-    let syncedAt: Date?
     let malformedCount: Int
 
     /// Accepts `{"messages": [...]}` or a bare array; anything else throws. A malformed entry is
@@ -23,7 +22,6 @@ struct MessagesFetchResponse {
         let envelope = try JSONDecoder().decode(JSON.self, from: data)
 
         let rawMessages: [JSON]
-        var syncedAt: Date?
         switch envelope {
         case .array(let array):
             rawMessages = array
@@ -32,7 +30,6 @@ struct MessagesFetchResponse {
                 throw MissingMessagesArrayError()
             }
             rawMessages = array
-            syncedAt = MessagesISO8601.date(from: object["syncedAt"])
         default:
             throw MissingMessagesArrayError()
         }
@@ -48,6 +45,6 @@ struct MessagesFetchResponse {
             }
         }
 
-        return MessagesFetchResponse(messages: messages, syncedAt: syncedAt, malformedCount: malformedCount)
+        return MessagesFetchResponse(messages: messages, malformedCount: malformedCount)
     }
 }
