@@ -8,7 +8,6 @@ final class MessageStore {
     typealias Location = MessageStoreLocation.Location
 
     let container: NSPersistentContainer
-    let modelVersion: Int
 
     /// All mutations, inside `perform`. Trump merge policy: the server is the source of truth.
     let writeContext: NSManagedObjectContext
@@ -16,9 +15,8 @@ final class MessageStore {
     /// All reads, inside `performAndWait`.
     let readContext: NSManagedObjectContext
 
-    init(location: Location, modelVersion: Int = MessageStoreSchema.modelVersion) throws {
-        self.modelVersion = modelVersion
-
+    init(location: Location) throws {
+        let modelVersion = MessageStoreSchema.modelVersion
         let model = MessageStoreSchema.makeModel()
         let container = NSPersistentContainer(name: "HightouchMessages", managedObjectModel: model)
 

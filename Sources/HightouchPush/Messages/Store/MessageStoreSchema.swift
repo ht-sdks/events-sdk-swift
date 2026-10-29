@@ -7,7 +7,9 @@ import CoreData
 /// `swift build`. `payload` holds the full message JSON; every other attribute is a projection of
 /// it for filtering and sorting.
 enum MessageStoreSchema {
-    /// Part of the store filename, so bumping it starts a fresh store.
+    /// Part of the store filename, so bumping it starts a fresh store and deletes the old one.
+    /// Bump it for a schema change lightweight migration can't infer, such as a changed attribute
+    /// type; added or removed attributes migrate on their own.
     static let modelVersion = 2
 
     static let entityName = "HTMessageEntity"
