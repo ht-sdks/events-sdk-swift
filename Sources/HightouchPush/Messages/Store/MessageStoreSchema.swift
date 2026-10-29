@@ -19,16 +19,13 @@ enum MessageStoreSchema {
         case campaignId
         case createdAt
         case expiresAt
-        case priority
         case priorityRank
         case locationId
         case variantSlug
-        case triggerType
         /// Not `version`, which collides with `NSObject.version`.
         case messageVersion
         case payload
         case insertedAt
-        case updatedAt
     }
 
     /// One model per process: two live models claiming the same class make Core Data's
@@ -68,23 +65,19 @@ enum MessageStoreSchema {
         let createdAt = attribute(.createdAt, type: .dateAttributeType, optional: true)
         // nil means "never expires".
         let expiresAt = attribute(.expiresAt, type: .dateAttributeType, optional: true)
-        let priority = attribute(.priority, type: .stringAttributeType, optional: true)
         let priorityRank = attribute(
             .priorityRank, type: .integer32AttributeType, optional: false, defaultValue: Int32.max
         )
         let locationId = attribute(.locationId, type: .stringAttributeType, optional: true)
         let variantSlug = attribute(.variantSlug, type: .stringAttributeType, optional: true)
-        let triggerType = attribute(.triggerType, type: .stringAttributeType, optional: true)
         let messageVersion = attribute(.messageVersion, type: .stringAttributeType, optional: true)
         let payload = attribute(.payload, type: .binaryDataAttributeType, optional: false)
         payload.allowsExternalBinaryDataStorage = true
         let insertedAt = attribute(.insertedAt, type: .dateAttributeType, optional: false)
-        let updatedAt = attribute(.updatedAt, type: .dateAttributeType, optional: false)
 
         entity.properties = [
             messageId, ownerKey, messageType, campaignId,
-            createdAt, expiresAt, priority, priorityRank, locationId, variantSlug, triggerType,
-            messageVersion, payload, insertedAt, updatedAt
+            createdAt, expiresAt, priorityRank, locationId, variantSlug, messageVersion, payload, insertedAt
         ]
 
         // Composite: the same message id can be cached for two owners on one device.

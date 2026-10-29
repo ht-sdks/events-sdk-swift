@@ -26,15 +26,12 @@ final class MessageStoreSchema_Tests: XCTestCase {
             .campaignId: Expected(type: .stringAttributeType, optional: true, defaultValue: nil),
             .createdAt: Expected(type: .dateAttributeType, optional: true, defaultValue: nil),
             .expiresAt: Expected(type: .dateAttributeType, optional: true, defaultValue: nil),
-            .priority: Expected(type: .stringAttributeType, optional: true, defaultValue: nil),
             .priorityRank: Expected(type: .integer32AttributeType, optional: false, defaultValue: Int32.max),
             .locationId: Expected(type: .stringAttributeType, optional: true, defaultValue: nil),
             .variantSlug: Expected(type: .stringAttributeType, optional: true, defaultValue: nil),
-            .triggerType: Expected(type: .stringAttributeType, optional: true, defaultValue: nil),
             .messageVersion: Expected(type: .stringAttributeType, optional: true, defaultValue: nil),
             .payload: Expected(type: .binaryDataAttributeType, optional: false, defaultValue: nil),
-            .insertedAt: Expected(type: .dateAttributeType, optional: false, defaultValue: nil),
-            .updatedAt: Expected(type: .dateAttributeType, optional: false, defaultValue: nil)
+            .insertedAt: Expected(type: .dateAttributeType, optional: false, defaultValue: nil)
         ]
 
         let propertiesByName = entity.attributesByName
@@ -129,6 +126,6 @@ final class MessageStoreSchema_Tests: XCTestCase {
         XCTAssertEqual(hash?.base64EncodedString(), MessageStoreSchema_Tests.expectedVersionHashBase64)
     }
 
-    static let expectedVersionHashBase64 = "VfJuRU/GCTXzVagoxim1ykBkd4oCb54T2s+iN5lBTvY="
+    static let expectedVersionHashBase64 = "oWTZP8r/4oJzsYv1Oyh+/PzPO8uqDU/VwfzyU+OAlRM="
 }
 #endif
