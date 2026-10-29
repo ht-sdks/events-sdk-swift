@@ -203,8 +203,6 @@ extension MessageStore {
     ) {
         entity.messageId = message.messageId
         entity.ownerKey = owner.storageKey
-        entity.ownerUserId = owner.kind == .userId ? owner.id : nil
-        entity.ownerAnonymousId = owner.kind == .anonymousId ? owner.id : nil
         entity.messageType = message.messageType
         entity.campaignId = message.campaignId
         entity.createdAt = message.createdAt
