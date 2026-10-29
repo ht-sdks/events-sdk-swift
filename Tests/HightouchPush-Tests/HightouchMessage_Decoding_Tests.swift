@@ -8,7 +8,7 @@ final class HightouchMessage_Decoding_Tests: XCTestCase {
 
     // A formatter with .withFractionalSeconds returns nil for a timestamp without them.
     private let fullPayloadString = """
-    {"messageType":"embedded","messageId":"msg_1","campaignId":"camp_1","createdAt":"2026-08-01T12:00:00.000Z","expiresAt":"2026-09-01T12:00:00.000Z","priority":"1","locationId":"home_banner","triggerType":"immediate","customValues":{},"version":"1","variantSlug":"two-button","content":{"elements":[{"id":"1","tag":"background","elementType":"image","order":null,"mediaUrl":"https://hqcoffe.com/beans.jpg","mediaCaption":"HQ beans","text":null}]}}
+    {"messageType":"embedded","messageId":"msg_1","campaignId":"camp_1","createdAt":"2026-08-01T12:00:00.000Z","expiresAt":"2026-09-01T12:00:00.000Z","priority":"high","locationId":"home_banner","triggerType":"immediate","customValues":{},"version":"1","variantSlug":"two-button","content":{"elements":[{"id":"1","tag":"background","elementType":"image","order":null,"mediaUrl":"https://hqcoffe.com/beans.jpg","mediaCaption":"HQ beans","text":null}]}}
     """
 
     private func makeJSON(_ jsonString: String) throws -> JSON {
@@ -30,8 +30,7 @@ final class HightouchMessage_Decoding_Tests: XCTestCase {
         XCTAssertEqual(message.messageId, "msg_1")
         XCTAssertEqual(message.messageType, "embedded")
         XCTAssertEqual(message.campaignId, "camp_1")
-        XCTAssertEqual(message.priority, "1")
-        XCTAssertEqual(message.priorityRank, 1)
+        XCTAssertEqual(message.priority, .high)
         XCTAssertEqual(message.locationId, "home_banner")
         XCTAssertEqual(message.variantSlug, "two-button")
         XCTAssertEqual(message.triggerType, "immediate")
@@ -76,8 +75,6 @@ final class HightouchMessage_Decoding_Tests: XCTestCase {
 
         XCTAssertEqual(reencoded["aBrandNewServerField"], raw["aBrandNewServerField"])
     }
-
-    // Lexicographically "10" < "9".
 
     func testMissingMessageIdThrows() throws {
         let raw = try makeJSON(#"{"messageType":"embedded"}"#)
@@ -162,65 +159,33 @@ final class HightouchMessage_Decoding_Tests: XCTestCase {
         XCTAssertEqual(message.customValues?["f"], .null)
     }
 
-    // MARK: - MessagePriority.rank(for:)
+    // MARK: - priority
 
-    func testPriorityRankNumericTakenAtFaceValueNotLexicographic() {
-        XCTAssertEqual(MessagePriority.rank(for: "1"), 1)
-        XCTAssertEqual(MessagePriority.rank(for: "9"), 9)
-        XCTAssertEqual(MessagePriority.rank(for: "10"), 10)
-        // anonymousId is always populated, so pre-seed an empty one in the storage suite Analytics reads at init.
-        XCTAssertGreaterThan(MessagePriority.rank(for: "10"), MessagePriority.rank(for: "9"))
+    func testPriorityDecodesEachLevel() throws {
+        for level in HightouchMessagePriority.allCases {
+            let raw = try makeJSON(#"{"messageId":"m","priority":"\#(level.rawValue)"}"#)
+            XCTAssertEqual(try HightouchMessage(raw: raw).priority, level)
+        }
     }
 
-    func testPriorityRankVocabularyIsTrimmedAndCaseInsensitive() {
-        XCTAssertEqual(MessagePriority.rank(for: "high"), 100)
-        XCTAssertEqual(MessagePriority.rank(for: "HIGH "), 100)
+    func testPriorityMissingEmptyOrUnrecognizedIsDefault() throws {
+        for payload in [
+            #"{"messageId":"m"}"#,
+            #"{"messageId":"m","priority":null}"#,
+            #"{"messageId":"m","priority":""}"#,
+            #"{"messageId":"m","priority":"urgent"}"#,
+            #"{"messageId":"m","priority":"HIGH"}"#,
+            #"{"messageId":"m","priority":1}"#,
+        ] {
+            XCTAssertEqual(try HightouchMessage(raw: makeJSON(payload)).priority, .default, payload)
+        }
     }
 
-    func testPriorityRankEmptyNilAndUnknownSortLast() {
-        XCTAssertEqual(MessagePriority.rank(for: ""), Int32.max)
-        XCTAssertEqual(MessagePriority.rank(for: nil), Int32.max)
-        XCTAssertEqual(MessagePriority.rank(for: "wat"), Int32.max)
+    func testPriorityRanksHighMediumLowThenDefault() {
+        let ranks = [HightouchMessagePriority.high, .medium, .low, .default].map(\.rank)
+        XCTAssertEqual(ranks, ranks.sorted())
+        XCTAssertEqual(Set(ranks).count, ranks.count)
     }
-
-    func testPriorityFromNumericJSONRanksSameAsStringSpelling() throws {
-        let numeric = try makeJSON(#"{"messageId":"m","priority":1}"#)
-        let string = try makeJSON(#"{"messageId":"m","priority":"1"}"#)
-
-        let fromNumeric = try HightouchMessage(raw: numeric)
-        let fromString = try HightouchMessage(raw: string)
-
-        XCTAssertEqual(fromNumeric.priority, "1")
-        XCTAssertEqual(fromNumeric.priorityRank, 1)
-        XCTAssertEqual(fromNumeric.priorityRank, fromString.priorityRank)
-    }
-
-    /// Not gated on Core Data: proves the public API compiles on Linux, tvOS and watchOS.
-    func testMisspelledPiorityKeyIsAcceptedAsPriority() throws {
-        let raw = try makeJSON(#"{"messageId":"m","piority":"1"}"#)
-        let message = try HightouchMessage(raw: raw)
-
-        XCTAssertEqual(message.priority, "1")
-        XCTAssertEqual(message.priorityRank, 1)
-    }
-
-    func testCorrectlySpelledPriorityTakesPrecedence() throws {
-        let raw = try makeJSON(#"{"messageId":"m","priority":"1","piority":"300"}"#)
-        let message = try HightouchMessage(raw: raw)
-
-        XCTAssertEqual(message.priority, "1")
-        XCTAssertEqual(message.priorityRank, 1)
-    }
-
-    func testPriorityFromFractionalJSONNumberSortsLast() throws {
-        let raw = try makeJSON(#"{"messageId":"m","priority":1.5}"#)
-        let message = try HightouchMessage(raw: raw)
-
-        XCTAssertNil(message.priority)
-        XCTAssertEqual(message.priorityRank, Int32.max)
-    }
-
-    /// Seeds through a second MessageStore on the same `.explicit` file, bypassing the facade.
 
     func testPayloadDataIsByteStableAcrossEncodes() throws {
         let raw = try makeJSON(#"{"messageId":"m","zeta":1,"alpha":2,"middle":{"y":1,"x":2}}"#)
