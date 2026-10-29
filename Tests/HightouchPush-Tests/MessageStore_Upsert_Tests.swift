@@ -308,5 +308,66 @@ final class MessageStore_Upsert_Tests: XCTestCase {
         let repeated = try replaceAllSync(store, [older, newer], owner: owner, limit: 1)
         XCTAssertTrue(repeated.insertedIds.isEmpty && repeated.removedIds.isEmpty, "a capped set must converge, not churn")
     }
+
+    // MARK: - reconcile
+
+    private func reconcileSync(
+        _ store: MessageStore,
+        _ messages: [HightouchMessage],
+        owner: MessageOwner,
+        maxStoredMessages: Int = 500,
+        now: Date
+    ) throws -> UpsertOutcome {
+        let done = expectation(description: "reconcile")
+        var outcome: Result<UpsertOutcome, Error>?
+        store.reconcile(messages, owner: owner, maxStoredMessages: maxStoredMessages, now: now) { result in
+            outcome = result
+            done.fulfill()
+        }
+        wait(for: [done], timeout: 5)
+        return try XCTUnwrap(outcome).get()
+    }
+
+    func testReconcileReportsTheOwnersRowsThatExpiredAsRemoved() throws {
+        let store = try makeStore()
+        let owner = MessageOwner(kind: .userId, id: "alice")
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let lapsing = try makeMessage(id: "lapsing", expiresAt: now.addingTimeInterval(10))
+        try replaceAllSync(store, [lapsing, try makeMessage(id: "kept")], owner: owner, now: now)
+
+        let later = now.addingTimeInterval(60)
+        let outcome = try reconcileSync(
+            store,
+            [lapsing, try makeMessage(id: "kept"), try makeMessage(id: "arrived_expired", expiresAt: now)],
+            owner: owner,
+            now: later
+        )
+
+        XCTAssertEqual(outcome.removedIds, ["lapsing"])
+        XCTAssertTrue(outcome.insertedIds.isEmpty, "a message already expired on arrival must not be inserted")
+        XCTAssertEqual(store.messages(matching: HightouchMessageQuery(includeExpired: true), owner: owner).map(\.messageId), ["kept"])
+    }
+
+    func testReconcilePrunesAndEvictsOnlyOtherOwnersInTheSameWrite() throws {
+        let store = try makeStore()
+        let alice = MessageOwner(kind: .userId, id: "alice")
+        let bob = MessageOwner(kind: .userId, id: "bob")
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        try replaceAllSync(store, [
+            try makeMessage(id: "bob_expired", expiresAt: now.addingTimeInterval(-1)),
+            try makeMessage(id: "bob_old"),
+            try makeMessage(id: "bob_new"),
+        ], owner: bob, now: now.addingTimeInterval(-100))
+
+        let outcome = try reconcileSync(
+            store, [try makeMessage(id: "a1"), try makeMessage(id: "a2")], owner: alice, maxStoredMessages: 3, now: now
+        )
+
+        XCTAssertEqual(Set(outcome.insertedIds), ["a1", "a2"])
+        XCTAssertTrue(outcome.removedIds.isEmpty, "other owners' rows are never reported in this owner's change")
+        XCTAssertEqual(totalRowCount(store), 3)
+        let bobIds = store.messages(matching: HightouchMessageQuery(includeExpired: true), owner: bob).map(\.messageId)
+        XCTAssertEqual(bobIds.count, 1, "bob's expired row is pruned and one more is evicted to fit the cap")
+    }
 }
 #endif
