@@ -223,27 +223,6 @@ public final class HightouchMessages {
         #endif
     }
 
-    /// Like `clearCachedMessages()`, but for every user that has synced on this device. Intended for
-    /// debug tooling.
-    public static func clearAllCachedMessagesForAllUsers(completion: ((Int) -> Void)? = nil) {
-        #if canImport(CoreData) && (os(iOS) || os(macOS) || targetEnvironment(macCatalyst))
-        setupQueue.sync {}
-        guard let store = stateQueue.sync(execute: { _store }) else {
-            DispatchQueue.main.async { completion?(0) }
-            return
-        }
-        MessageDismissalLog().clear()
-        store.deleteAllOwners { removedIds in
-            if !removedIds.isEmpty {
-                notifyChange(HightouchMessagesChange(insertedIds: [], updatedIds: [], removedIds: removedIds))
-            }
-            DispatchQueue.main.async { completion?(removedIds.count) }
-        }
-        #else
-        DispatchQueue.main.async { completion?(0) }
-        #endif
-    }
-
     /// Removes one cached message for the current user, without a network call. Completes on the
     /// main queue with whether a row was removed.
     public static func deleteMessage(withId messageId: String, completion: ((Bool) -> Void)? = nil) {
