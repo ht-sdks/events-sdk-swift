@@ -142,7 +142,6 @@ final class MessagesSyncCoordinator {
         return true
     }
 
-    /// Each store call is a `perform` on the same serial context, so they run in order.
     private func handleFetchSuccess(_ response: MessagesFetchResponse, owner: MessageOwner, updatesCooldown: Bool) {
         if response.malformedCount > 0 {
             let error = MalformedMessagesError(count: response.malformedCount)
@@ -155,32 +154,27 @@ final class MessagesSyncCoordinator {
         }
 
         // The server still returns dismissed messages; a closure so the log is read on the write
-        // queue (see `replaceAll`).
-        store.replaceAll(response.messages, owner: owner, limit: config.maxStoredMessages, suppressing: {
+        // queue, in order with dismissals' deletes.
+        store.reconcile(response.messages, owner: owner, maxStoredMessages: config.maxStoredMessages, suppressing: {
             HightouchMessages.dismissedIds(owner: owner)
         }) { [weak self] result in
             guard let self = self else { return }
             switch result {
             case .success(let outcome):
-                self.store.pruneExpired()
-                // `owner` already fits under the cap (see `replaceAll`'s limit), so only other
-                // owners' rows are evicted and every change to `owner` is in `outcome`.
-                self.store.enforceLimit(maxStoredMessages: self.config.maxStoredMessages, preserving: owner) { _ in
-                    if updatesCooldown {
-                        self.userDefaults.set(Date().timeIntervalSince1970, forKey: MessagesSyncCoordinator.lastSyncedAtDefaultsKey)
-                        self.userDefaults.set(owner.storageKey, forKey: MessagesSyncCoordinator.lastSyncedOwnerDefaultsKey)
-                    }
-
-                    let change = HightouchMessagesChange(
-                        insertedIds: outcome.insertedIds,
-                        updatedIds: outcome.updatedIds,
-                        removedIds: outcome.removedIds
-                    )
-                    if !change.insertedIds.isEmpty || !change.updatedIds.isEmpty || !change.removedIds.isEmpty {
-                        HightouchMessages.notifyChange(change)
-                    }
-                    self.finish(.success(change))
+                if updatesCooldown {
+                    self.userDefaults.set(Date().timeIntervalSince1970, forKey: MessagesSyncCoordinator.lastSyncedAtDefaultsKey)
+                    self.userDefaults.set(owner.storageKey, forKey: MessagesSyncCoordinator.lastSyncedOwnerDefaultsKey)
                 }
+
+                let change = HightouchMessagesChange(
+                    insertedIds: outcome.insertedIds,
+                    updatedIds: outcome.updatedIds,
+                    removedIds: outcome.removedIds
+                )
+                if !change.insertedIds.isEmpty || !change.updatedIds.isEmpty || !change.removedIds.isEmpty {
+                    HightouchMessages.notifyChange(change)
+                }
+                self.finish(.success(change))
             case .failure(let error):
                 self.analytics.reportInternalError(error)
                 self.finish(.failure(error))
