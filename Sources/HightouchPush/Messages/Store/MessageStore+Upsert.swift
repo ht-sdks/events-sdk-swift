@@ -209,7 +209,7 @@ extension MessageStore {
         entity.campaignId = message.campaignId
         entity.createdAt = message.createdAt
         entity.expiresAt = message.expiresAt
-        entity.priority = message.priority
+        entity.priority = message.priority.rawValue
         entity.priorityRank = message.priorityRank
         entity.locationId = message.locationId
         entity.variantSlug = message.variantSlug
