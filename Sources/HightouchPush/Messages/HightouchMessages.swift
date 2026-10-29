@@ -14,7 +14,7 @@ public final class HightouchMessages {
     // thread while the host's main thread is querying.
     private static let stateQueue = DispatchQueue(label: "com.hightouch.messages.facade")
 
-    private static let queryQueue = DispatchQueue(label: "com.hightouch.messages.query")
+    static let queryQueue = DispatchQueue(label: "com.hightouch.messages.query")
 
     /// Opens the store off the caller's thread so `initialize` never blocks launch on Core Data I/O.
     /// Anything that needs the store waits for, or queues behind, the work enqueued here.
@@ -113,6 +113,11 @@ public final class HightouchMessages {
         }
     }
 
+    /// Unlike `currentStoreAndOwner()`, doesn't wait for the store to open.
+    private static func currentOwner() -> MessageOwner? {
+        stateQueue.sync { _analytics }.flatMap { MessageOwner.current(analytics: $0) }
+    }
+
     /// Blocks until a pending `initialize` has opened the store. Never call it on `setupQueue`.
     private static func currentStoreAndOwner() -> (MessageStore, MessageOwner)? {
         setupQueue.sync {}
@@ -165,15 +170,29 @@ public final class HightouchMessages {
     }
 
     /// Same as `messages(matching:)`, but fetches off the calling thread and completes on the main
-    /// queue.
+    /// queue. If the user changes before the result is delivered, it's fetched again for the new user.
     public static func loadMessages(
         matching query: HightouchMessageQuery,
         completion: @escaping ([HightouchMessage]) -> Void
     ) {
+        #if canImport(CoreData) && (os(iOS) || os(macOS) || targetEnvironment(macCatalyst))
         queryQueue.async {
-            let result = messages(matching: query)
-            DispatchQueue.main.async { completion(result) }
+            guard let (store, owner) = currentStoreAndOwner() else {
+                DispatchQueue.main.async { completion([]) }
+                return
+            }
+            let result = store.messages(matching: query, owner: owner)
+            DispatchQueue.main.async {
+                guard currentOwner() == owner else {
+                    loadMessages(matching: query, completion: completion)
+                    return
+                }
+                completion(result)
+            }
         }
+        #else
+        DispatchQueue.main.async { completion([]) }
+        #endif
     }
 
     /// `async` counterpart to `loadMessages(matching:completion:)`.
