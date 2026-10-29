@@ -9,8 +9,6 @@ import CoreData
 final class HTMessageEntity: NSManagedObject {
     @NSManaged var messageId: String
     @NSManaged var ownerKey: String
-    @NSManaged var ownerUserId: String?
-    @NSManaged var ownerAnonymousId: String?
     @NSManaged var messageType: String?
     @NSManaged var campaignId: String?
     @NSManaged var createdAt: Date?

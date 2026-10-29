@@ -15,8 +15,6 @@ enum MessageStoreSchema {
     enum Attr: String {
         case messageId
         case ownerKey
-        case ownerUserId
-        case ownerAnonymousId
         case messageType
         case campaignId
         case createdAt
@@ -65,8 +63,6 @@ enum MessageStoreSchema {
 
         let messageId = attribute(.messageId, type: .stringAttributeType, optional: false)
         let ownerKey = attribute(.ownerKey, type: .stringAttributeType, optional: false)
-        let ownerUserId = attribute(.ownerUserId, type: .stringAttributeType, optional: true)
-        let ownerAnonymousId = attribute(.ownerAnonymousId, type: .stringAttributeType, optional: true)
         let messageType = attribute(.messageType, type: .stringAttributeType, optional: true)
         let campaignId = attribute(.campaignId, type: .stringAttributeType, optional: true)
         let createdAt = attribute(.createdAt, type: .dateAttributeType, optional: true)
@@ -86,7 +82,7 @@ enum MessageStoreSchema {
         let updatedAt = attribute(.updatedAt, type: .dateAttributeType, optional: false)
 
         entity.properties = [
-            messageId, ownerKey, ownerUserId, ownerAnonymousId, messageType, campaignId,
+            messageId, ownerKey, messageType, campaignId,
             createdAt, expiresAt, priority, priorityRank, locationId, variantSlug, triggerType,
             messageVersion, payload, insertedAt, updatedAt
         ]
