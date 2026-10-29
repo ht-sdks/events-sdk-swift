@@ -17,7 +17,7 @@ final class MessagesGoldenPayload_Tests: XCTestCase {
           "campaignId": "camp_coffee_launch",
           "createdAt": "2026-08-05T12:00:00.000Z",
           "expiresAt": "2099-09-05T12:00:00.000Z",
-          "priority": "1",
+          "priority": "high",
           "locationId": "home_promo",
           "triggerType": "immediate",
           "customValues": { "roastLevel": "medium", "featured": true },
@@ -93,13 +93,11 @@ final class MessagesGoldenPayload_Tests: XCTestCase {
         XCTAssertNotNil(message.expiresAt)
     }
 
-    func testGoldenPayloadPriorityRanksFirstNotLast() throws {
+    func testGoldenPayloadPriorityDecodes() throws {
         let response = try MessagesFetchResponse.parse(XCTUnwrap(goldenPayload.data(using: .utf8)))
         let message = try XCTUnwrap(response.messages.first)
 
-        XCTAssertEqual(message.priority, "1")
-        XCTAssertEqual(message.priorityRank, 1)
-        XCTAssertNotEqual(message.priorityRank, Int32.max, "a misspelled priority key would land here")
+        XCTAssertEqual(message.priority, .high)
     }
 
     func testGoldenPayloadPreservesContentAndCustomValues() throws {
