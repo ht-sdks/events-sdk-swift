@@ -147,7 +147,13 @@ final class MessagesSyncCoordinator {
     /// Each store call is a `perform` on the same serial context, so they run in order.
     private func handleFetchSuccess(_ response: MessagesFetchResponse, owner: MessageOwner, updatesCooldown: Bool) {
         if response.malformedCount > 0 {
-            analytics.reportInternalError(MalformedMessagesError(count: response.malformedCount))
+            let error = MalformedMessagesError(count: response.malformedCount)
+            analytics.reportInternalError(error)
+            // Replacing with an empty set would delete the owner's whole cache.
+            if response.messages.isEmpty {
+                finish(.failure(error))
+                return
+            }
         }
 
         // The server still returns dismissed messages; a closure so the log is read on the write

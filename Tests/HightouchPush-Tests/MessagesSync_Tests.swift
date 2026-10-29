@@ -211,6 +211,23 @@ final class MessagesSync_Tests: XCTestCase {
         XCTAssertEqual(errorCounter.count, 1, "one malformed row should report exactly once, not per-row")
     }
 
+    func testAResponseWhereEveryMessageIsMalformedFailsAndKeepsTheCache() throws {
+        let store = try makeStore()
+        let analytics = makeAnalytics(writeKey: "\(name)-all-malformed")
+        let owner = MessageOwner(kind: .userId, id: "alice-\(name)")
+        let coordinator = makeCoordinator(analytics: analytics, store: store, ownerProvider: { _ in owner })
+        StubMessagesURLProtocol.enqueue(status: 200, body: try messagesBody(["m1"]))
+        _ = try syncSync(coordinator)
+
+        let body = try JSONSerialization.data(withJSONObject: ["messages": [["notAnId": "oops"], ["messageId": ""]]])
+        StubMessagesURLProtocol.enqueue(status: 200, body: body)
+        let result = try syncSync(coordinator)
+
+        guard case .failure(let error) = result else { return XCTFail("an all-malformed response must fail the sync") }
+        XCTAssertEqual((error as? MalformedMessagesError)?.count, 2)
+        XCTAssertEqual(store.messages(matching: HightouchMessageQuery(), owner: owner).map { $0.messageId }, ["m1"])
+    }
+
     // MARK: - Bare top-level array envelope
 
     func testBareTopLevelArrayEnvelopeIsAccepted() throws {
