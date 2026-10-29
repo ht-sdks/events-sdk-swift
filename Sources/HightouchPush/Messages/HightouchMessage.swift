@@ -11,9 +11,7 @@ public struct HightouchMessage: Equatable {
     public let createdAt: Date?
     /// nil means the message never expires.
     public let expiresAt: Date?
-    public let priority: String?
-    /// Derived locally from `priority`; lower sorts first.
-    public let priorityRank: Int32
+    public let priority: HightouchMessagePriority
     public let locationId: String?
     public let variantSlug: String?
     public let triggerType: String?
@@ -38,10 +36,7 @@ public struct HightouchMessage: Equatable {
         self.campaignId = raw["campaignId"]?.stringValue
         self.createdAt = MessagesISO8601.date(from: raw["createdAt"])
         self.expiresAt = MessagesISO8601.date(from: raw["expiresAt"])
-        self.priority = MessagePriority.payloadKeys.lazy
-            .compactMap { MessagePriority.rawValue(from: raw[$0]) }
-            .first
-        self.priorityRank = MessagePriority.rank(for: self.priority)
+        self.priority = HightouchMessagePriority(payloadValue: raw["priority"])
         self.locationId = raw["locationId"]?.stringValue
         self.variantSlug = raw["variantSlug"]?.stringValue
         self.triggerType = raw["triggerType"]?.stringValue
@@ -51,15 +46,13 @@ public struct HightouchMessage: Equatable {
         self.raw = raw
     }
 
-    /// `priorityRank` defaults to the rank derived from `priority`.
     public init(
         messageId: String,
         messageType: String = "",
         campaignId: String? = nil,
         createdAt: Date? = nil,
         expiresAt: Date? = nil,
-        priority: String? = nil,
-        priorityRank: Int32? = nil,
+        priority: HightouchMessagePriority = .default,
         locationId: String? = nil,
         variantSlug: String? = nil,
         triggerType: String? = nil,
@@ -74,7 +67,6 @@ public struct HightouchMessage: Equatable {
         self.createdAt = createdAt
         self.expiresAt = expiresAt
         self.priority = priority
-        self.priorityRank = priorityRank ?? MessagePriority.rank(for: priority)
         self.locationId = locationId
         self.variantSlug = variantSlug
         self.triggerType = triggerType
@@ -96,6 +88,8 @@ extension HightouchMessage: Codable {
 }
 
 extension HightouchMessage {
+    var priorityRank: Int32 { priority.rank }
+
     /// Decodes a message from bytes previously produced by `payloadData()`.
     public static func decode(payload: Data) throws -> HightouchMessage {
         try JSONDecoder().decode(HightouchMessage.self, from: payload)
