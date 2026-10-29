@@ -74,32 +74,15 @@ final class HTMessageCommand_Tests: XCTestCase {
         XCTAssertNil(HTMessageCommand(userInfo))
     }
 
-    // MARK: - deleteMessage operand
-
-    func testDeleteMessageOperandParsed() {
+    // The server sends every inbox change, removals included, as `syncMessages`.
+    func testDeleteMessageIsNotARecognizedVerb() {
         let userInfo: [AnyHashable: Any] = [
             "hightouch": [
                 "command": ["verb": "deleteMessage", "messageId": "msg_abc"],
             ] as [String: Any],
         ]
 
-        let command = HTMessageCommand(userInfo)
-
-        XCTAssertEqual(command?.verb, .deleteMessage)
-        XCTAssertEqual(command?.messageId, "msg_abc")
-    }
-
-    func testSyncMessagesHasNoOperand() {
-        let userInfo: [AnyHashable: Any] = [
-            "hightouch": [
-                "command": ["verb": "syncMessages"],
-            ] as [String: Any],
-        ]
-
-        let command = HTMessageCommand(userInfo)
-
-        XCTAssertEqual(command?.verb, .syncMessages)
-        XCTAssertNil(command?.messageId)
+        XCTAssertNil(HTMessageCommand(userInfo))
     }
 
     // MARK: - Advisory hints

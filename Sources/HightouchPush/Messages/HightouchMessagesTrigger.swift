@@ -86,17 +86,6 @@ enum HightouchMessagesTrigger {
         switch command.verb {
         case .syncMessages:
             return mapOutcome(await sync(command))
-
-        case .deleteMessage:
-            // `.noData` rather than `.failed` for a missing operand: `.failed` counts against future
-            // background delivery budget.
-            guard let messageId = command.messageId, !messageId.isEmpty else {
-                return (.noData, 0)
-            }
-            let deleted = await withCheckedContinuation { continuation in
-                HightouchMessages.deleteMessage(withId: messageId) { continuation.resume(returning: $0) }
-            }
-            return deleted ? (.newData, 1) : (.noData, 0)
         }
     }
 
