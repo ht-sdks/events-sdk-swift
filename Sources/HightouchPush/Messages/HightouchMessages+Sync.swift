@@ -144,6 +144,7 @@ extension HightouchMessages {
             return
         }
 
+        // The coordinator already completes on the main queue.
         coordinator.sync(force: force, updatesCooldown: updatesCooldown) { result in
             let outcome: HightouchSyncOutcome
             switch result {
@@ -158,9 +159,7 @@ extension HightouchMessages {
             case .failure(let error):
                 outcome = .failed(error)
             }
-            if let completion = completion {
-                DispatchQueue.main.async { completion(outcome) }
-            }
+            completion?(outcome)
         }
     }
 
