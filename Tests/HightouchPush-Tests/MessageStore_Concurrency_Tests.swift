@@ -7,23 +7,7 @@ import CoreData
 
 final class MessageStore_Concurrency_Tests: XCTestCase {
 
-    private func makeStore() throws -> MessageStore {
-        try MessageStore(location: .ephemeral)
-    }
-
-    private func makeMessage(id: String) throws -> HightouchMessage {
-        try HightouchMessage(raw: try JSON(["messageId": id]))
-    }
-
-    private func totalRowCount(_ store: MessageStore) -> Int {
-        var count = 0
-        store.readContext.performAndWait {
-            let fetch = NSFetchRequest<HTMessageEntity>(entityName: MessageStoreSchema.entityName)
-            count = (try? store.readContext.count(for: fetch)) ?? 0
-        }
-        return count
-    }
-
+    /// Duplicated from Hightouch-Tests' `checkIfLeaked`: SPM test targets can't depend on one another.
     private func assertEventuallyDeallocated(_ instance: AnyObject, file: StaticString = #filePath, line: UInt = #line) {
         addTeardownBlock { [weak instance] in
             XCTAssertNil(instance, "instance should have been deallocated; potential leak", file: file, line: line)
@@ -43,7 +27,7 @@ final class MessageStore_Concurrency_Tests: XCTestCase {
         DispatchQueue.concurrentPerform(iterations: owners.count) { index in
             do {
                 let ids = sharedIds + ["unique_\(index)"]
-                let messages = try ids.map { try self.makeMessage(id: $0) }
+                let messages = try ids.map { try makeMessage(id: $0) }
                 store.replaceAll(messages, owner: owners[index], now: Date()) { result in
                     if case .failure(let error) = result {
                         XCTFail("replaceAll failed for owner \(index): \(error)")

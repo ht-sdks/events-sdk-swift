@@ -7,43 +7,6 @@ import CoreData
 
 final class MessageStore_Query_Tests: XCTestCase {
 
-    private func makeStore() throws -> MessageStore {
-        try MessageStore(location: .ephemeral)
-    }
-
-    private func makeMessage(
-        id: String,
-        locationId: String? = nil,
-        variantSlug: String? = nil,
-        priority: String? = nil,
-        createdAt: Date? = nil
-    ) throws -> HightouchMessage {
-        var dict: [String: Any] = ["messageId": id]
-        if let locationId = locationId { dict["locationId"] = locationId }
-        if let variantSlug = variantSlug { dict["variantSlug"] = variantSlug }
-        if let priority = priority { dict["priority"] = priority }
-        if let createdAt = createdAt { dict["createdAt"] = ISO8601DateFormatter().string(from: createdAt) }
-        let raw = try JSON(dict)
-        return try HightouchMessage(raw: raw)
-    }
-
-    @discardableResult
-    private func replaceAllSync(
-        _ store: MessageStore,
-        _ messages: [HightouchMessage],
-        owner: MessageOwner,
-        now: Date = Date()
-    ) throws -> UpsertOutcome {
-        let expectation = expectation(description: "replaceAll")
-        var outcome: Result<UpsertOutcome, Error>?
-        store.replaceAll(messages, owner: owner, now: now) { result in
-            outcome = result
-            expectation.fulfill()
-        }
-        wait(for: [expectation], timeout: 5)
-        return try XCTUnwrap(outcome).get()
-    }
-
     // MARK: - Filter combinations
 
     func testLocationOnlyVariantOnlyBothAndNeitherFilters() throws {
