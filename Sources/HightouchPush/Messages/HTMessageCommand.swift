@@ -7,13 +7,9 @@ struct HTMessageCommand {
     /// Unrecognized verbs fail `init?`, so older SDKs ignore verbs added later.
     enum Verb: String {
         case syncMessages
-        case deleteMessage
     }
 
     let verb: Verb
-
-    /// Operand for `deleteMessage`; unused by `syncMessages`.
-    let messageId: String?
 
     /// `hightouch.messageId`, used only to attribute the `delivered` event.
     let pushMessageId: String?
@@ -36,7 +32,6 @@ struct HTMessageCommand {
         }
 
         self.verb = verb
-        self.messageId = commandDict[PayloadKey.messageId] as? String
         self.pushMessageId = raw[PayloadKey.messageId] as? String
         self.reason = commandDict[PayloadKey.reason] as? String
         self.messageIds = commandDict[PayloadKey.messageIds] as? [String]
