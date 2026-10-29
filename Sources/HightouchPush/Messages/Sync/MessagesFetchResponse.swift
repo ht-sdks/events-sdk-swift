@@ -10,14 +10,15 @@ struct MalformedMessagesError: Error {
 /// `replaceAll` delete every cached message for the owner.
 struct MissingMessagesArrayError: Error {}
 
-/// The decoded result of a messages fetch. Treated as the authoritative full set for the owner:
-/// `replaceAll` deletes anything it omits, so a paged response would lose data.
+/// The decoded result of a messages fetch, treated as the owner's complete set: `replaceAll`
+/// deletes anything it omits. The gateway returns every unexpired message in one response, and
+/// this endpoint must never paginate, since released SDKs would take a page for the full set.
 struct MessagesFetchResponse {
     let messages: [HightouchMessage]
     let malformedCount: Int
 
     /// Accepts `{"messages": [...]}` or a bare array; anything else throws. A malformed entry is
-    /// counted and dropped; it never fails the whole sync.
+    /// counted and dropped rather than failing the parse.
     static func parse(_ data: Data) throws -> MessagesFetchResponse {
         let envelope = try JSONDecoder().decode(JSON.self, from: data)
 
