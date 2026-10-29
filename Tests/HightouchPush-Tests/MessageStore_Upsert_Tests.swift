@@ -233,7 +233,6 @@ final class MessageStore_Upsert_Tests: XCTestCase {
             let first = Self.makeBareEntity(in: store.writeContext)
             first.messageId = "dup"
             first.ownerKey = owner.storageKey
-            first.messageType = ""
             first.priorityRank = 1
             first.payload = Data([0x01])
             first.insertedAt = now
@@ -242,7 +241,6 @@ final class MessageStore_Upsert_Tests: XCTestCase {
             let second = Self.makeBareEntity(in: store.writeContext)
             second.messageId = "dup"
             second.ownerKey = owner.storageKey
-            second.messageType = ""
             second.priorityRank = 2
             second.payload = Data([0x02])
             second.insertedAt = now

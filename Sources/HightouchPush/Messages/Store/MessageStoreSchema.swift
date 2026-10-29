@@ -67,7 +67,7 @@ enum MessageStoreSchema {
         let ownerKey = attribute(.ownerKey, type: .stringAttributeType, optional: false)
         let ownerUserId = attribute(.ownerUserId, type: .stringAttributeType, optional: true)
         let ownerAnonymousId = attribute(.ownerAnonymousId, type: .stringAttributeType, optional: true)
-        let messageType = attribute(.messageType, type: .stringAttributeType, optional: false, defaultValue: "")
+        let messageType = attribute(.messageType, type: .stringAttributeType, optional: true)
         let campaignId = attribute(.campaignId, type: .stringAttributeType, optional: true)
         let createdAt = attribute(.createdAt, type: .dateAttributeType, optional: true)
         // nil means "never expires".

@@ -24,7 +24,7 @@ final class MessageStoreSchema_Tests: XCTestCase {
             .ownerKey: Expected(type: .stringAttributeType, optional: false, defaultValue: nil),
             .ownerUserId: Expected(type: .stringAttributeType, optional: true, defaultValue: nil),
             .ownerAnonymousId: Expected(type: .stringAttributeType, optional: true, defaultValue: nil),
-            .messageType: Expected(type: .stringAttributeType, optional: false, defaultValue: ""),
+            .messageType: Expected(type: .stringAttributeType, optional: true, defaultValue: nil),
             .campaignId: Expected(type: .stringAttributeType, optional: true, defaultValue: nil),
             .createdAt: Expected(type: .dateAttributeType, optional: true, defaultValue: nil),
             .expiresAt: Expected(type: .dateAttributeType, optional: true, defaultValue: nil),
@@ -131,6 +131,6 @@ final class MessageStoreSchema_Tests: XCTestCase {
         XCTAssertEqual(hash?.base64EncodedString(), MessageStoreSchema_Tests.expectedVersionHashBase64)
     }
 
-    static let expectedVersionHashBase64 = "xV158Mmw0dVMZZc7IRHjR6IppPvKu0e9WHSCc/S/1ZU="
+    static let expectedVersionHashBase64 = "bYSlIW4FjuHUUaGgTer+98I6Km/y73XGxaSKqDQDQVE="
 }
 #endif
