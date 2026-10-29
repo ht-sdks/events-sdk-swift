@@ -586,16 +586,13 @@ final class MessagesSync_Tests: XCTestCase {
 
     func testRequestFactoryRunsAfterTheSDKHeaders() throws {
         let analytics = makeAnalytics(writeKey: "\(name)-factory")
-        let client = MessagesHTTPClient(
-            analytics: analytics,
-            config: HightouchMessagesConfig(),
-            protocolClasses: [StubMessagesURLProtocol.self],
-            requestFactory: { request in
-                var request = request
-                request.setValue("override-user", forHTTPHeaderField: "x-hightouch-user-id")
-                return request
-            }
-        )
+        var config = HightouchMessagesConfig()
+        config.requestFactory = { request in
+            var request = request
+            request.setValue("override-user", forHTTPHeaderField: "x-hightouch-user-id")
+            return request
+        }
+        let client = MessagesHTTPClient(analytics: analytics, config: config, protocolClasses: [StubMessagesURLProtocol.self])
 
         let request = try fetch(with: client)
         XCTAssertEqual(request.value(forHTTPHeaderField: "x-hightouch-user-id"), "override-user")

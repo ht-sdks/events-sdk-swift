@@ -47,9 +47,7 @@ final class MessagesSyncCoordinator {
         self.analytics = analytics
         self.config = config
         self.store = store
-        self.client = client ?? MessagesHTTPClient(
-            analytics: analytics, config: config, requestFactory: config.requestFactory
-        )
+        self.client = client ?? MessagesHTTPClient(analytics: analytics, config: config)
         self.userDefaults = userDefaults
         self.ownerProvider = ownerProvider
         self.deviceTokenProvider = deviceTokenProvider
