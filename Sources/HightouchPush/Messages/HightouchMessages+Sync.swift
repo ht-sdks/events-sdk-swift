@@ -42,9 +42,6 @@ extension HightouchMessages {
     /// response mustn't hold off the next foreground sync.
     static func identityDidChange() {
         #if canImport(CoreData) && (os(iOS) || os(macOS) || targetEnvironment(macCatalyst))
-        #if DEBUG
-        if Analytics.isRunningUnitTests { return }
-        #endif
         syncInternal(force: false, updatesCooldown: false, completion: nil)
         #endif
     }
@@ -53,10 +50,6 @@ extension HightouchMessages {
     /// ghost push arrived.
     static func syncOnInitialize() {
         #if canImport(CoreData) && (os(iOS) || os(macOS) || targetEnvironment(macCatalyst))
-        #if DEBUG
-        // Skip the live request under unit tests, like the core SDK's settings fetch does.
-        if Analytics.isRunningUnitTests { return }
-        #endif
         syncInternal(force: true, completion: nil)
         #endif
     }
