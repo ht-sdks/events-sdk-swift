@@ -27,14 +27,26 @@ extension MessageStore {
         }
     }
 
+    /// Reports the removed message ids, fetched first because a batch delete only returns object IDs.
     func deleteAll(owner: MessageOwner, completion: (([String]) -> Void)? = nil) {
-        let predicate = NSPredicate(format: "%K == %@", MessageStoreSchema.Attr.ownerKey.rawValue, owner.storageKey)
-        deleteReportingIds(matching: predicate, completion: completion)
-    }
+        writeContext.perform {
+            let predicate = NSPredicate(format: "%K == %@", MessageStoreSchema.Attr.ownerKey.rawValue, owner.storageKey)
+            do {
+                let idFetch = NSFetchRequest<HTMessageEntity>(entityName: MessageStoreSchema.entityName)
+                idFetch.predicate = predicate
+                idFetch.returnsObjectsAsFaults = false
+                let deletedIds = try self.writeContext.fetch(idFetch).map { $0.messageId }
 
-    /// Removes rows for every owner on the device. Debug tooling only.
-    func deleteAllOwners(completion: (([String]) -> Void)? = nil) {
-        deleteReportingIds(matching: nil, completion: completion)
+                if !deletedIds.isEmpty {
+                    _ = try self.executeBatchDelete(matching: predicate)
+                }
+                self.writeContext.reset()
+                completion?(deletedIds)
+            } catch {
+                self.writeContext.reset()
+                completion?([])
+            }
+        }
     }
 
     /// Must run inside `writeContext.perform`. A batch delete bypasses every context, so
@@ -52,27 +64,6 @@ extension MessageStore {
             into: [readContext]
         )
         return objectIDs
-    }
-
-    /// Reports the removed message ids, fetched first because a batch delete only returns object IDs.
-    private func deleteReportingIds(matching predicate: NSPredicate?, completion: (([String]) -> Void)?) {
-        writeContext.perform {
-            do {
-                let idFetch = NSFetchRequest<HTMessageEntity>(entityName: MessageStoreSchema.entityName)
-                idFetch.predicate = predicate
-                idFetch.returnsObjectsAsFaults = false
-                let deletedIds = try self.writeContext.fetch(idFetch).map { $0.messageId }
-
-                if !deletedIds.isEmpty {
-                    _ = try self.executeBatchDelete(matching: predicate)
-                }
-                self.writeContext.reset()
-                completion?(deletedIds)
-            } catch {
-                self.writeContext.reset()
-                completion?([])
-            }
-        }
     }
 }
 #endif
