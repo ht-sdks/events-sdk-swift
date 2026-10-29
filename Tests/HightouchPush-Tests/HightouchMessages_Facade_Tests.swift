@@ -95,6 +95,28 @@ final class HightouchMessages_Facade_Tests: XCTestCase {
         XCTAssertEqual(asyncMessages, [])
     }
 
+    // MARK: - loadMessages identity
+
+    func testLoadMessagesRefetchesWhenTheUserChangesBeforeDelivery() throws {
+        let url = tempStoreURL()
+        _ = try seed([try makeMessage(id: "alice_msg")], owner: MessageOwner(kind: .userId, id: "alice"), at: url)
+        _ = try seed([try makeMessage(id: "bob_msg")], owner: MessageOwner(kind: .userId, id: "bob"), at: url)
+        let analytics = initializeFacade(at: url, userId: "alice")
+
+        let completed = expectation(description: "completion delivered")
+        var delivered: [String] = []
+        HightouchMessages.loadMessages(matching: HightouchMessageQuery()) { messages in
+            delivered = messages.map(\.messageId)
+            completed.fulfill()
+        }
+        // Alice's read has finished and its delivery is queued behind this test on main.
+        HightouchMessages.queryQueue.sync {}
+        analytics.identify(userId: "bob")
+        wait(for: [completed], timeout: 5)
+
+        XCTAssertEqual(delivered, ["bob_msg"], "a result read for the previous user must not be delivered")
+    }
+
     // MARK: - loadMessages threading
 
     func testLoadMessagesDoesNotRunFetchOnTheCallingThread() throws {
