@@ -7,7 +7,7 @@ This file provides instructions for AI agents working on this Swift SDK.
 - **Language**: Swift (swift-tools-version 5.7+)
 - **Package Manager**: Swift Package Manager (SPM)
 - **Testing**: XCTest
-- **CI**: GitHub Actions (Xcode 15.4 on macOS 14, Swift 5.10.1 on Linux)
+- **CI**: GitHub Actions (Xcode 16.4 and 26.3 on macOS 15, Swift 6.4 on Linux)
 - **State Management**: [Sovran-Swift](https://github.com/segmentio/Sovran-Swift.git) (from 1.1.0)
 - **Product**: `Hightouch` — the Hightouch Events SDK for Apple platforms and Linux
 
@@ -182,16 +182,16 @@ swift test
 
 ```bash
 # iOS Simulator
-xcodebuild -scheme Hightouch test -sdk iphonesimulator \
-  -destination 'platform=iOS Simulator,name=iPhone 15'
+xcodebuild -scheme Hightouch-Package test -sdk iphonesimulator \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
 
 # tvOS Simulator
-xcodebuild -scheme Hightouch test -sdk appletvsimulator \
+xcodebuild -scheme Hightouch-Package test -sdk appletvsimulator \
   -destination 'platform=tvOS Simulator,name=Apple TV'
 
 # watchOS Simulator
-xcodebuild -scheme Hightouch test -sdk watchsimulator \
-  -destination 'platform=watchOS Simulator,name=Apple Watch Series 9 (45mm)'
+xcodebuild -scheme Hightouch-Package test -sdk watchsimulator \
+  -destination 'platform=watchOS Simulator,name=Apple Watch Series 10 (46mm)'
 ```
 
 **Linux:**
@@ -223,12 +223,13 @@ Runs on push/PR to `main`. Jobs:
 
 | Job                        | Runner               | What it does                                                                |
 | -------------------------- | -------------------- | --------------------------------------------------------------------------- |
-| `build_and_test_spm_mac`   | macOS 14, Xcode 15.4 | `swift build` + `swift test`                                                |
-| `build_and_test_spm_linux` | Ubuntu, Swift 5.10.1 | `swift build` + `swift test --enable-test-discovery`                        |
-| `build_and_test_ios`       | macOS 14, Xcode 15.4 | `xcodebuild test` on iPhone 15 simulator                                    |
-| `build_and_test_tvos`      | macOS 14, Xcode 15.4 | `xcodebuild test` on Apple TV simulator                                     |
-| `build_and_test_watchos`   | macOS 14, Xcode 15.4 | `xcodebuild test` on Apple Watch Series 9 simulator                         |
-| `build_and_test_examples`  | macOS 14, Xcode 15.4 | Builds BasicExample, ObjCExample, UIKitExample, WeatherWidget, Mac Catalyst |
+| `build_and_test_spm_mac`   | macOS 15, Xcode 16.4 | `swift build` + `swift test`                                                |
+| `build_and_test_spm_linux` | Ubuntu, Swift 6.4    | `swift build` + `swift test --enable-test-discovery`                        |
+| `build_and_test_ios`       | macOS 15, Xcode 26.3 | `xcodebuild test` on iPhone 17 Pro simulator                                |
+| `build_and_test_tvos`      | macOS 15, Xcode 26.3 | `xcodebuild test` on Apple TV simulator                                     |
+| `build_and_test_watchos`   | macOS 15, Xcode 16.4 | `xcodebuild test` on Apple Watch Series 10 (46mm) simulator                 |
+| `build_and_test_examples`  | macOS 15, Xcode 16.4 | Builds BasicExample, ObjCExample, UIKitExample, WeatherWidget, Mac Catalyst |
+| `build_braze_example`      | macOS 15, Xcode 26.3 | Builds BrazeExample for the iOS Simulator                                   |
 
 ### Release Workflow (`.github/workflows/xcframework-release.yml`)
 
