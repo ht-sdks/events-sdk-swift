@@ -293,6 +293,20 @@ This version string is used in:
 
 ## Testing Patterns
 
+> **`swift test` on macOS runs ZERO iOS-gated tests.** Any test file wrapped in
+> `#if os(iOS) || targetEnvironment(macCatalyst)` contributes **nothing** to a plain `swift test`
+> run on a Mac — `HightouchPushBadge_Tests.swift` has always behaved this way. A green `swift test`
+> is therefore **not** evidence that gated tests pass; they may never have executed. Real coverage
+> requires the simulator:
+>
+> ```bash
+> xcodebuild test -scheme Hightouch-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
+> ```
+>
+> Current baselines: `swift test` = **342 tests**; simulator = **371 tests** (92 `Hightouch-Tests`
+> + 57 `HightouchBraze-Tests` + 222 `HightouchPush-Tests`), 0 failures. Check `xcrun simctl list devices available` if that
+> device name has aged out.
+
 - **`OutputReaderPlugin`**: An `.after` plugin that captures the last event for assertions. Defined in `Tests/Hightouch-Tests/Support/TestUtilities.swift`.
 - **`waitUntilStarted(analytics:)`**: Spins the run loop until the `StartupQueue` reports `running == true`. Required before asserting on events.
 - **`hardReset(doYouKnowHowToUseThis:)`**: Clears all stored events and user defaults for a given write key. Used in tests that need a clean slate.
