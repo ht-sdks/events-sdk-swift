@@ -12,11 +12,11 @@ concurrency:
 
 jobs:
   build_and_test_spm_mac:
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
-          xcode-version: "15.4"
+          xcode-version: "16.4"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Build
         run: swift build
@@ -61,20 +61,20 @@ jobs:
       - run: xcodebuild -scheme Hightouch-Package test -sdk appletvsimulator -destination 'platform=tvOS Simulator,name=Apple TV'
 
   build_and_test_watchos:
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
-          xcode-version: "15.4"
+          xcode-version: "16.4"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: xcodebuild -scheme Hightouch-Package test -sdk watchsimulator -destination 'platform=watchOS Simulator,name=Apple Watch Series 9 (45mm)'
+      - run: xcodebuild -scheme Hightouch-Package test -sdk watchsimulator -destination 'platform=watchOS Simulator,name=Apple Watch Series 10 (46mm)'
 
   build_and_test_examples:
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1.7.0
         with:
-          xcode-version: "15.4"
+          xcode-version: "16.4"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: build for ios simulator
         run: |
