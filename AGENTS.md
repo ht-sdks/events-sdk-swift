@@ -224,7 +224,7 @@ Runs on push/PR to `main`. Jobs:
 | Job                        | Runner               | What it does                                                                |
 | -------------------------- | -------------------- | --------------------------------------------------------------------------- |
 | `build_and_test_spm_mac`   | macOS 15, Xcode 16.4 | `swift build` + `swift test`                                                |
-| `build_and_test_spm_linux` | Ubuntu, Swift 6.4    | `swift build` + `swift test --enable-test-discovery`                        |
+| `build_and_test_spm_linux` | Ubuntu 24.04, Swift 6.4 | `swift build` + `swift test --enable-test-discovery`                        |
 | `build_and_test_ios`       | macOS 15, Xcode 26.3 | `xcodebuild test` on iPhone 17 Pro simulator                                |
 | `build_and_test_tvos`      | macOS 15, Xcode 26.3 | `xcodebuild test` on Apple TV simulator                                     |
 | `build_and_test_watchos`   | macOS 15, Xcode 16.4 | `xcodebuild test` on Apple Watch Series 10 (46mm) simulator                 |
