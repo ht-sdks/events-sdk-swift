@@ -134,6 +134,50 @@ final class HightouchPush_Tests: XCTestCase {
         XCTAssertNil(merged["_ht_message_context"])
     }
 
+    // MARK: - CepEventTracking.baseProperties(channel:)
+
+    func testBasePropertiesDefaultsToPushChannel() {
+        let base = CepEventTracking.baseProperties()
+
+        XCTAssertEqual(base["channel_type"] as? String, "push")
+        XCTAssertEqual(base["_ht_cep_source"] as? String, "push_sdk")
+    }
+
+    func testBasePropertiesForInAppChannel() {
+        let base = CepEventTracking.baseProperties(channel: .inApp)
+
+        XCTAssertEqual(base["channel_type"] as? String, "in_app")
+        XCTAssertEqual(base["_ht_cep_source"] as? String, "in_app_sdk")
+    }
+
+    func testBasePropertiesWinOverMessageContextForInAppChannel() {
+        let baseKeys = CepEventTracking.baseProperties(channel: .inApp).keys
+        var hijackContext: [String: Any] = ["messageId": "msg-1"]
+        for key in baseKeys { hijackContext[key] = "hijacked-\(key)" }
+
+        let merged = CepEventTracking.mergedProperties(
+            properties: [:],
+            messageContext: hijackContext,
+            channel: .inApp
+        )
+
+        for (key, baseValue) in CepEventTracking.baseProperties(channel: .inApp) {
+            XCTAssertEqual(
+                String(describing: merged[key] ?? ""),
+                String(describing: baseValue),
+                "messageContext stomped on in_app base property \(key)"
+            )
+        }
+        XCTAssertEqual(merged["messageId"] as? String, "msg-1")
+    }
+
+    func testNewProviderEventTypeConstants() {
+        XCTAssertEqual(CepEventTracking.pushDelivered, "delivered")
+        XCTAssertEqual(CepEventTracking.messageDisplayed, "displayed")
+        XCTAssertEqual(CepEventTracking.messageClicked, "clicked")
+        XCTAssertEqual(CepEventTracking.messageDismissed, "dismissed")
+    }
+
     // MARK: - HightouchPush.isSchemeAllowed
 
     func testHttpsIsAlwaysAllowedRegardlessOfCaseAndList() {
