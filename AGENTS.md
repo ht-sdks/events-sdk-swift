@@ -327,6 +327,20 @@ func testMyFeature() {
 - `UserDefaults` on Linux: setting a key's value to `nil` causes a deadlock — use `removeObject(forKey:)` instead.
 - `XCTExpectFailure` is not available on Linux. Tests using it are gated with `#if !os(Linux)`.
 
+### Core Data (Embedded Messages)
+
+The messages feature under `Sources/HightouchPush/Messages/` is the only Core Data in the repo. Three things about it are easy to get wrong:
+
+- **The platform gate must be this exact string**, byte-identical, in every store file so it greps cleanly:
+  ```swift
+  #if canImport(CoreData) && (os(iOS) || os(macOS) || targetEnvironment(macCatalyst))
+  ```
+  `canImport(CoreData)` **alone is insufficient** — it is `true` on tvOS and watchOS. tvOS has no durable non-purgeable storage (which is why `Storage.swift` routes it to `cachesDirectory`), and a Caches purge that removes `.sqlite` while `-wal` survives corrupts the store. Building for tvOS/watchOS successfully does **not** prove the gate works, since Core Data imports fine there; verify with `nm` that no `HTMessageEntity`/`MessageStore` symbols are present.
+- **The model is built programmatically** (`MessageStoreSchema.makeModel()`), not from an `.xcdatamodeld`. `momc` is Xcode-only and a model resource breaks `swift build` on Linux. `MessageStoreSchema_Tests` pins the model's `versionHash` against a checked-in constant, so any schema edit fails CI loudly — that test replaces the visual diffing an Xcode model editor would give you. Update it deliberately, never reflexively.
+- **Tests must not use `NSInMemoryStoreType`.** It does not enforce uniqueness constraints and throws on `NSBatchDeleteRequest`, so the upsert backstop and the entire prune/delete path would silently false-pass. Use `MessageStore.Location.ephemeral`, a SQLite store at `/dev/null`, which is fully featured and needs no cleanup. Use `.explicit(tempURL)` when a test needs two stores over one file.
+
+Note also that a batch delete bypasses every `NSManagedObjectContext`, so it must be followed by `mergeChanges(fromRemoteContextSave:into:)`. A test asserting only through a fresh fetch **cannot** catch its omission — a fresh fetch always hits the store. The tests that do catch it retain a managed object registered *before* the delete and assert it flips to `isDeleted`.
+
 ### Test Isolation
 
 Tests share the same `UserDefaults` suite (`com.hightouch.storage.<writeKey>`). If a test modifies state, either:
