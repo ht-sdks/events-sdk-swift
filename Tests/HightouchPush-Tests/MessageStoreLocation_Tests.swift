@@ -22,11 +22,14 @@ final class MessageStoreLocation_Tests: XCTestCase {
 
     // MARK: - Backup exclusion
 
+    // swift-corelibs-foundation doesn't implement isExcludedFromBackup; it reads back nil.
+    #if !os(Linux)
     func testMessagesDirectoryIsExcludedFromBackup() throws {
         let directory = try MessageStoreLocation.messagesDirectory()
         let values = try directory.resourceValues(forKeys: [.isExcludedFromBackupKey])
         XCTAssertEqual(values.isExcludedFromBackup, true)
     }
+    #endif
 
     // MARK: - Model version in the filename
 
