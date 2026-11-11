@@ -22,10 +22,10 @@ final class MessageStoreLocation_Tests: XCTestCase {
 
     // MARK: - Backup exclusion
 
-    func testMessagesDirectoryIsExcludedFromBackup() throws {
-        let directory = try MessageStoreLocation.messagesDirectory()
-        let values = try directory.resourceValues(forKeys: [.isExcludedFromBackupKey])
-        XCTAssertEqual(values.isExcludedFromBackup, true)
+    func testMessagesDirectoryRequestsBackupExclusion() throws {
+        var excluded: [URL] = []
+        let directory = try MessageStoreLocation.messagesDirectory(excludeFromBackup: { excluded.append($0) })
+        XCTAssertEqual(excluded.map(\.standardizedFileURL), [directory.standardizedFileURL])
     }
 
     // MARK: - Model version in the filename
