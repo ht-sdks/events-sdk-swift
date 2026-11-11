@@ -6,9 +6,44 @@
 //
 
 import XCTest
+import Sovran
 @testable import Hightouch
 
 class StorageTests: XCTestCase {
+
+    func testEncodingFailureDoesNotCorruptBatch() throws {
+        let storage = Storage(store: Store(), writeKey: UUID().uuidString)
+        defer { storage.hardReset(doYouKnowHowToUseThis: true) }
+        storage.write(.events, value: UnencodableEvent())
+        let emptyFiles: [URL] = try XCTUnwrap(storage.read(.events))
+        XCTAssertTrue(emptyFiles.isEmpty)
+        storage.write(.events, value: IdentifyEvent(userId: "before"))
+        storage.write(.events, value: UnencodableEvent())
+        storage.write(.events, value: IdentifyEvent(userId: "after"))
+        let files: [URL] = try XCTUnwrap(storage.read(.events))
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: XCTUnwrap(files.first))) as? [String: Any])
+        let batch = try XCTUnwrap(json["batch"] as? [[String: Any]])
+        XCTAssertEqual(batch.compactMap { $0["userId"] as? String }, ["before", "after"])
+    }
+
+    func testReopensUnfinishedBatch() throws {
+        for contents in ["{ \"batch\": [", "{ \"batch\": [{\"userId\":\"previous\"}"] {
+            let storage = Storage(store: Store(), writeKey: UUID().uuidString)
+            defer { storage.hardReset(doYouKnowHowToUseThis: true) }
+            storage.write(.events, value: IdentifyEvent(userId: "seed"))
+            let seedFiles: [URL] = try XCTUnwrap(storage.read(.events))
+            let directory = try XCTUnwrap(seedFiles.first).deletingLastPathComponent()
+            storage.hardReset(doYouKnowHowToUseThis: true)
+            let file = directory.appendingPathComponent("0-hightouch-events")
+            try Data(contents.utf8).write(to: file)
+
+            storage.write(.events, value: IdentifyEvent(userId: "next"))
+            let files: [URL] = try XCTUnwrap(storage.read(.events))
+            let json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: XCTUnwrap(files.first))) as? [String: Any])
+            let batch = try XCTUnwrap(json["batch"] as? [[String: Any]])
+            XCTAssertEqual(batch.compactMap { $0["userId"] as? String }, contents.hasSuffix("[") ? ["next"] : ["previous", "next"])
+        }
+    }
 
     override func setUpWithError() throws {
         // Put setup code here. This method is called before the invocation of each test method in the class.
@@ -161,4 +196,21 @@ class StorageTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: fileURL.path))
     }
     
+}
+
+private struct UnencodableEvent: RawEvent {
+    @Noncodable var enrichments: [EnrichmentClosure]?
+    var type: String?
+    var anonymousId: String?
+    var messageId: String?
+    var userId: String?
+    var timestamp: String?
+    var context: JSON?
+    var integrations: JSON?
+    var metrics: [JSON]?
+    var _metadata: DestinationMetadata?
+
+    func encode(to encoder: Encoder) throws {
+        throw EncodingError.invalidValue("event", .init(codingPath: [], debugDescription: "Cannot encode event"))
+    }
 }
