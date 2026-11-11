@@ -22,22 +22,10 @@ final class MessageStoreLocation_Tests: XCTestCase {
 
     // MARK: - Backup exclusion
 
-    func testMessagesDirectoryIsExcludedFromBackup() throws {
-        // swift-corelibs-foundation doesn't implement this key and always reads back nil.
-        let scratch = FileManager.default.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: scratch) }
-        var probe = URLResourceValues()
-        probe.isExcludedFromBackup = true
-        var scratchURL = scratch
-        try scratchURL.setResourceValues(probe)
-        let supported = try scratch.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup != nil
-        try XCTSkipUnless(supported, "Foundation on this platform can't report isExcludedFromBackup")
-
-        let directory = try MessageStoreLocation.messagesDirectory()
-        let values = try directory.resourceValues(forKeys: [.isExcludedFromBackupKey])
-        XCTAssertEqual(values.isExcludedFromBackup, true)
+    func testMessagesDirectoryRequestsBackupExclusion() throws {
+        var excluded: [URL] = []
+        let directory = try MessageStoreLocation.messagesDirectory(excludeFromBackup: { excluded.append($0) })
+        XCTAssertEqual(excluded.map(\.standardizedFileURL), [directory.standardizedFileURL])
     }
 
     // MARK: - Model version in the filename

@@ -36,7 +36,9 @@ enum MessageStoreLocation {
     /// `<Application Support>/Hightouch/Messages/`, excluded from backup. One store per app: the sandbox
     /// gives each app its own Application Support, except on macOS and Mac Catalyst, where an
     /// unsandboxed app shares it per user, hence the bundle identifier.
-    static func messagesDirectory() throws -> URL {
+    static func messagesDirectory(
+        excludeFromBackup: (URL) -> Void = MessageStoreLocation.excludeFromBackup
+    ) throws -> URL {
         let base = try FileManager.default.url(
             for: .applicationSupportDirectory,
             in: .userDomainMask,
