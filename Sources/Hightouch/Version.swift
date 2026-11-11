@@ -15,4 +15,4 @@
 // Use release.sh's automation.
 
 // BREAKING.FEATURE.FIX
-internal let __hightouch_version = "1.0.0"
+internal let __hightouch_version = "1.1.0"
