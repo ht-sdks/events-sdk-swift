@@ -1,5 +1,9 @@
 import Foundation
 
+#if os(Linux)
+import FoundationNetworking
+#endif
+
 /// Configuration for embedded messages. Set it on `HightouchPushConfig.messages` to enable them.
 public struct HightouchMessagesConfig {
 
