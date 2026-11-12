@@ -164,6 +164,7 @@ internal class Storage: Subscriber {
 
 extension Storage {
     private static let tempExtension = "temp"
+    private static let batchHeader = "{ \"batch\": ["
     
     enum Constants: String, CaseIterable {
         case userId = "hightouch.userId"
@@ -261,6 +262,13 @@ extension Storage {
 
 extension Storage {
     private func storeEvent(toFile file: URL, event: RawEvent) {
+        let json: Data
+        do {
+            json = try JSONEncoder().encode(event)
+        } catch {
+            analytics?.reportInternalError(error)
+            return
+        }
         var storeFile = file
         
         let fm = FileManager.default
@@ -270,6 +278,12 @@ extension Storage {
             newFile = true
         } else if outputStream == nil {
             // this can happen if an instance was terminated before finishing a file.
+            do {
+                newFile = try Data(contentsOf: storeFile) == Data(Storage.batchHeader.utf8)
+            } catch {
+                analytics?.reportInternalError(error)
+                return
+            }
             open(file: storeFile)
         }
         
@@ -284,27 +298,22 @@ extension Storage {
             newFile = true
         }
         
-        let jsonString = event.toString()
         do {
             if outputStream == nil {
                 Analytics.segmentLog(message: "Storage: Output stream is nil for \(storeFile)", kind: .error)
             }
-            if newFile == false {
-                // prepare for the next entry
-                try outputStream?.write(",")
-            }
-            try outputStream?.write(jsonString)
+            let entry = (newFile ? Data() : Data(",".utf8)) + json
+            try outputStream?.write(entry)
         } catch {
             analytics?.reportInternalError(error)
         }
     }
     
     private func start(file: URL) {
-        let contents = "{ \"batch\": ["
         do {
             outputStream = try OutputFileStream(fileURL: file)
             try outputStream?.create()
-            try outputStream?.write(contents)
+            try outputStream?.write(Storage.batchHeader)
         } catch {
             analytics?.reportInternalError(error)
         }

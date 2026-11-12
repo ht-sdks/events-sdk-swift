@@ -137,6 +137,9 @@ public class SegmentDestination: DestinationPlugin, Subscriber {
                         case .success(_):
                             storage.remove(file: url)
                             self.cleanupUploads()
+                        case .failure(HTTPClientErrors.statusCode(let code))
+                            where (400..<500).contains(code) && code != 408 && code != 429:
+                            storage.remove(file: url)
                         default:
                             break
                     }
