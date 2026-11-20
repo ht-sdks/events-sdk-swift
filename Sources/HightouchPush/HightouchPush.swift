@@ -101,7 +101,6 @@ public final class HightouchPush {
     ///
     ///     let configuration = Configuration(writeKey: "WRITE_KEY")
     ///         .apiHost("ap-south-1.hightouch-events.com/v1")
-    ///         .cdnHost("ap-south-1.hightouch-events.com/v1")
     ///     HightouchPush.initialize(
     ///         configuration: configuration,
     ///         config: HightouchPushConfig(appId: "APP_ID")
