@@ -24,7 +24,6 @@ public class HTTPClient {
     internal var session: URLSession
     private var apiHost: String
     private var apiKey: String
-    private var cdnHost: String
     
     private weak var analytics: Analytics?
     
@@ -33,7 +32,6 @@ public class HTTPClient {
         
         self.apiKey = analytics.configuration.values.writeKey
         self.apiHost = analytics.configuration.values.apiHost
-        self.cdnHost = analytics.configuration.values.cdnHost
         
         self.session = Self.configuredSession(for: self.apiKey)
     }
@@ -89,49 +87,6 @@ public class HTTPClient {
         
         dataTask.resume()
         return dataTask
-    }
-    
-    func settingsFor(writeKey: String, completion: @escaping (Bool, Settings?) -> Void) {
-        guard let settingsURL = segmentURL(for: cdnHost, path: "/projects/\(writeKey)/settings") else {
-            completion(false, nil)
-            return
-        }
-        
-        let urlRequest = configuredRequest(for: settingsURL, method: "GET")
-        
-        let dataTask = session.dataTask(with: urlRequest) { [weak self] (data, response, error) in
-            if let error = error {
-                self?.analytics?.reportInternalError(AnalyticsError.networkUnknown(error))
-                completion(false, nil)
-                return
-            }
-
-            if let httpResponse = response as? HTTPURLResponse {
-                if httpResponse.statusCode > 300 {
-                    self?.analytics?.reportInternalError(AnalyticsError.networkUnexpectedHTTPCode(httpResponse.statusCode))
-                    completion(false, nil)
-                    return
-                }
-            }
-
-            guard let data = data else {
-                self?.analytics?.reportInternalError(AnalyticsError.networkInvalidData)
-                completion(false, nil)
-                return
-            }
-            
-            do {
-                let responseJSON = try JSONDecoder().decode(Settings.self, from: data)
-                completion(true, responseJSON)
-            } catch {
-                self?.analytics?.reportInternalError(AnalyticsError.jsonUnableToDeserialize(error))
-                completion(false, nil)
-                return
-            }
-            
-        }
-        
-        dataTask.resume()
     }
     
     deinit {

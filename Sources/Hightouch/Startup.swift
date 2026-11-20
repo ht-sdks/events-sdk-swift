@@ -32,10 +32,8 @@ extension Analytics: Subscriber {
             policy.configure(analytics: self)
         }
         
-        // plugins will receive any settings we currently have as they are added.
-        // ... but lets go check if we have new stuff ....
-        // start checking periodically for settings changes from segment.com
-        setupSettingsCheck()
+        // Plugins receive local settings as they are added, before queued events are released.
+        store.dispatch(action: System.ToggleRunningAction(running: true))
     }
     
     internal func platformPlugins() -> [PlatformPlugin]? {
@@ -75,47 +73,3 @@ extension Analytics: Subscriber {
         }
     }
 }
-
-#if os(iOS) || os(tvOS) || targetEnvironment(macCatalyst)
-import UIKit
-extension Analytics {
-    internal func setupSettingsCheck() {
-        // do the first one
-        checkSettings()
-        // set up return-from-background to do it again.
-        NotificationCenter.default.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: OperationQueue.main) { [weak self] (notification) in
-            guard let app = notification.object as? UIApplication else { return }
-            if app.applicationState == .background {
-                self?.checkSettings()
-            }
-        }
-    }
-}
-#elseif os(watchOS)
-extension Analytics {
-    internal func setupSettingsCheck() {
-        // TBD: we don't know what to do here yet.
-        checkSettings()
-    }
-}
-#elseif os(macOS)
-import Cocoa
-extension Analytics {
-    internal func setupSettingsCheck() {
-        // do the first one
-        checkSettings()
-        // now set up a timer to do it every 24 hrs.
-        // mac apps change focus a lot more than iOS apps, so this
-        // seems more appropriate here.
-        QueueTimer.schedule(interval: .days(1), queue: .main) { [weak self] in
-            self?.checkSettings()
-        }
-    }
-}
-#elseif os(Linux)
-extension Analytics {
-    internal func setupSettingsCheck() {
-        checkSettings()
-    }
-}
-#endif

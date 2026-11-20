@@ -85,15 +85,8 @@ public class ObjCConfiguration: NSObject {
         }
     }
     
-    /// Sets a default set of Settings.  Normally these will come from Segment's
-    /// api.segment.com/v1/projects/<writekey>/settings, however in instances such
-    /// as first app launch, it can be useful to have a pre-set batch of settings to
-    /// ensure that the proper destinations and other settings are enabled prior
-    /// to receiving them from the Settings endpoint.  The default is `nil`.
-    ///
-    /// You can retrieve a copy of your settings from the following URL:
-    ///
-    /// https://cdn-settings.segment.com/v1/projects/<writekey>/settings
+    /// Sets local destination settings used when no cached settings are available.
+    /// Remote settings are not fetched.
     @objc
     public var defaultSettings: [String: Any] {
         get {
@@ -148,10 +141,9 @@ public class ObjCConfiguration: NSObject {
         }
     }
 
-    /// Sets an alternative CDN host for settings retrieval. This is useful when
-    /// a proxy is in use, or settings need to be queried from certain locales at
-    /// all times (such as the EU). The default value is `cdn-settings.segment.com/v1`.
+    /// Remote settings are not fetched. This option has no effect.
     @objc
+    @available(*, deprecated, message: "Remote settings are not fetched. Use defaultSettings to configure plugins.")
     public var cdnHost: String {
         get {
             return configuration.values.cdnHost
