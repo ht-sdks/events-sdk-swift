@@ -44,6 +44,8 @@ public class SegmentDestination: DestinationPlugin, Subscriber {
     private var uploads = [UploadTaskInfo]()
     private let uploadsQueue = DispatchQueue(label: "uploadsQueue.hightouch.com")
     private var storage: Storage?
+    private var nextSourceProbe: DispatchTime?
+    private var probeDelay = 1
     
     @Atomic internal var eventCount: Int = 0
     
@@ -120,6 +122,9 @@ public class SegmentDestination: DestinationPlugin, Subscriber {
         // don't flush if analytics is disabled.
         guard analytics.enabled == true else { return }
 
+        let retryAt = uploadsQueue.sync { nextSourceProbe }
+        if let retryAt = retryAt, DispatchTime.now() < retryAt { return }
+
         // Read events from file system
         guard let data = storage.read(Storage.Constants.events) else { return }
         
@@ -129,14 +134,24 @@ public class SegmentDestination: DestinationPlugin, Subscriber {
         analytics.log(message: "Uploads in-progress: \(pendingUploads)")
         
         if pendingUploads == 0 {
-            for url in data {
+            for url in data.prefix(retryAt == nil ? data.count : 1) {
                 analytics.log(message: "Processing Batch:\n\(url.lastPathComponent)")
                 
                 let uploadTask = httpClient.startBatchUpload(writeKey: analytics.configuration.values.writeKey, batch: url) { (result) in
                     switch result {
                         case .success(_):
+                            if retryAt != nil {
+                                self.uploadsQueue.sync {
+                                    self.nextSourceProbe = nil
+                                    self.probeDelay = 1
+                                }
+                            }
                             storage.remove(file: url)
                             self.cleanupUploads()
+                        case .failure(HTTPClientErrors.statusCode(let code))
+                            where [401, 403, 404].contains(code):
+                            analytics.log(message: "HTTP \(code). Check the write key and endpoint. Retaining the upload.")
+                            self.scheduleSourceProbe()
                         case .failure(HTTPClientErrors.statusCode(let code))
                             where (400..<500).contains(code) && code != 408 && code != 429:
                             storage.remove(file: url)
@@ -164,6 +179,16 @@ public class SegmentDestination: DestinationPlugin, Subscriber {
 // MARK: - Upload management
 
 extension SegmentDestination {
+    private func scheduleSourceProbe() {
+        uploadsQueue.sync {
+            let now = DispatchTime.now()
+            if let next = nextSourceProbe, next > now { return }
+            let deadline = now + DispatchTimeInterval.seconds(probeDelay)
+            nextSourceProbe = deadline
+            probeDelay = min(60, probeDelay * 2)
+        }
+    }
+
     internal func cleanupUploads() {
         // lets go through and get rid of any tasks that aren't running.
         // either they were suspended because a background task took too
