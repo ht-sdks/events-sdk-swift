@@ -37,6 +37,26 @@ final class Analytics_Tests: XCTestCase {
         XCTAssertTrue(try FileManager.default.contentsOfDirectory(atPath: analytics.storage.startupDirectory.path).isEmpty)
     }
 
+    func testStartupQueueKeepsFileWhenDestinationWriteFails() throws {
+        let analytics = Analytics(configuration: Configuration(writeKey: UUID().uuidString))
+        waitUntilStarted(analytics: analytics)
+        let queue = try XCTUnwrap(analytics.find(pluginType: StartupQueue.self))
+        let state = try XCTUnwrap(analytics.store.currentState() as System?)
+        let directory = analytics.storage.startupDirectory
+        let batchIndex = analytics.storage.userDefaults?.integer(forKey: Storage.Constants.events.rawValue) ?? 0
+        let batch = directory.deletingLastPathComponent().appendingPathComponent("\(batchIndex)-hightouch-events")
+        try FileManager.default.createDirectory(at: batch, withIntermediateDirectories: true)
+        queue.running = false
+        var track = TrackEvent(event: "early", properties: nil)
+        track.messageId = UUID().uuidString
+        XCTAssertNil(queue.execute(event: track))
+        queue.runningUpdate(state: state)
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: directory.path).count, 1)
+        try FileManager.default.removeItem(at: batch)
+        queue.runningUpdate(state: state)
+        XCTAssertTrue(try FileManager.default.contentsOfDirectory(atPath: directory.path).isEmpty)
+    }
+
     func testBaseEventCreation() {
         let analytics = Analytics(configuration: Configuration(writeKey: "test"))
         let myDestination = MyDestination()

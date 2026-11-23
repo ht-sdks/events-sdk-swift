@@ -21,6 +21,15 @@ public class StartupQueue: Plugin, Subscriber {
     }
 
     private let lock = NSRecursiveLock()
+    private var replayingId: String?
+    private var handoffFailed = false
+
+    internal func writeFailed(messageId: String?) {
+        lock.lock()
+        defer { lock.unlock() }
+        if replayingId != nil && replayingId == messageId { handoffFailed = true }
+    }
+
     private var nextIndex: Int?
     private var sessionEvents = [Int: RawEvent]()
 
@@ -71,13 +80,17 @@ public class StartupQueue: Plugin, Subscriber {
         do { saved = try files(in: analytics.storage.startupDirectory) }
         catch { analytics.reportInternalError(error) }
         for index in Set(saved.keys).union(sessionEvents.keys).sorted() {
+            guard analytics.enabled else { break }
             if let event = sessionEvents.removeValue(forKey: index) {
                 analytics.process(event: event)
             } else if let file = saved[index] {
                 do {
                     let event = try Self.decode(Data(contentsOf: file))
+                    replayingId = event.messageId
+                    handoffFailed = false
                     analytics.process(event: event)
-                    try FileManager.default.removeItem(at: file)
+                    replayingId = nil
+                    if !handoffFailed { try FileManager.default.removeItem(at: file) }
                 } catch {
                     analytics.reportInternalError(error)
                 }
