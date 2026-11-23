@@ -44,6 +44,7 @@ public class SegmentDestination: DestinationPlugin, Subscriber {
     private var uploads = [UploadTaskInfo]()
     private let uploadsQueue = DispatchQueue(label: "uploadsQueue.hightouch.com")
     private var storage: Storage?
+    private let flushLock = NSLock()
     private var nextSourceProbe: DispatchTime?
     private var probeDelay = 1
     
@@ -122,6 +123,8 @@ public class SegmentDestination: DestinationPlugin, Subscriber {
         // don't flush if analytics is disabled.
         guard analytics.enabled == true else { return }
 
+        guard flushLock.try() else { return }
+        defer { flushLock.unlock() }
         let retryAt = uploadsQueue.sync { nextSourceProbe }
         if let retryAt = retryAt, DispatchTime.now() < retryAt { return }
 
@@ -156,7 +159,7 @@ public class SegmentDestination: DestinationPlugin, Subscriber {
                             where (400..<500).contains(code) && code != 408 && code != 429:
                             storage.remove(file: url)
                         default:
-                            break
+                            if retryAt != nil { self.scheduleSourceProbe() }
                     }
                     
                     analytics.log(message: "Processed: \(url.lastPathComponent)")
