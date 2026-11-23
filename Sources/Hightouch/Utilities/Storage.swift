@@ -224,6 +224,10 @@ extension Storage {
         return segmentURL
     }
     
+    var startupDirectory: URL {
+        return eventStorageDirectory().appendingPathComponent("startup", isDirectory: true)
+    }
+
     private func eventsFile(index: Int) -> URL {
         let docs = eventStorageDirectory()
         let fileURL = docs.appendingPathComponent("\(index)-hightouch-events")

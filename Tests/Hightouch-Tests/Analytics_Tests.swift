@@ -3,6 +3,40 @@ import XCTest
 
 final class Analytics_Tests: XCTestCase {
     
+    func testStartupQueueRestoresOriginalIdentity() throws {
+        var errors = [Error]()
+        let configuration = Configuration(writeKey: UUID().uuidString).errorHandler { errors.append($0) }
+        let analytics = Analytics(configuration: configuration)
+        waitUntilStarted(analytics: analytics)
+        let queue = try XCTUnwrap(analytics.find(pluginType: StartupQueue.self))
+        let observer = OutputReaderPlugin()
+        analytics.add(plugin: observer)
+        let state = try XCTUnwrap(analytics.store.currentState() as System?)
+        queue.running = false
+        var track = TrackEvent(event: "early", properties: nil)
+        track.userId = "original"
+        track.messageId = UUID().uuidString
+        track.anonymousId = "anonymous"
+        track.timestamp = Date().iso8601()
+        XCTAssertNil(queue.execute(event: track))
+        var sessionOnly = track
+        sessionOnly.enrichments = [{ $0 }]
+        XCTAssertNil(queue.execute(event: sessionOnly))
+        XCTAssertTrue(errors.contains { if case AnalyticsError.enrichmentError = $0 { return true }; return false })
+        let files = try FileManager.default.contentsOfDirectory(at: analytics.storage.startupDirectory,
+                                                                 includingPropertiesForKeys: nil)
+        XCTAssertEqual(files.count, 1)
+        queue.running = true
+        let restored = StartupQueue()
+        restored.analytics = analytics
+        restored.runningUpdate(state: state)
+        XCTAssertEqual(observer.lastEvent?.messageId, track.messageId)
+        XCTAssertEqual(observer.lastEvent?.timestamp, track.timestamp)
+        XCTAssertEqual(observer.lastEvent?.anonymousId, track.anonymousId)
+        XCTAssertEqual(observer.lastEvent?.userId, track.userId)
+        XCTAssertTrue(try FileManager.default.contentsOfDirectory(atPath: analytics.storage.startupDirectory.path).isEmpty)
+    }
+
     func testBaseEventCreation() {
         let analytics = Analytics(configuration: Configuration(writeKey: "test"))
         let myDestination = MyDestination()
