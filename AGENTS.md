@@ -366,4 +366,4 @@ Tests share the same `UserDefaults` suite (`com.hightouch.storage.<writeKey>`). 
 
 ### Startup Timing
 
-The SDK fetches settings asynchronously on startup. In tests, always call `waitUntilStarted(analytics:)` before making assertions to ensure the startup queue has drained. Without this, events may be queued rather than processed.
+The SDK releases its startup queue asynchronously after configuring plugins with local settings. In tests, always call `waitUntilStarted(analytics:)` before making assertions to ensure the startup queue has drained. Without this, events may be queued rather than processed.
