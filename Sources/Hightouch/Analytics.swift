@@ -81,7 +81,7 @@ public class Analytics {
     
     internal func process<E: RawEvent>(incomingEvent: E, enrichments: [EnrichmentClosure]? = nil) {
         guard enabled == true else { return }
-        guard dataCollectionEnabled else { return }
+        guard mayCollect(incomingEvent) else { return }
         let event = incomingEvent.applyRawEventData(store: store, enrichments: enrichments)
         
         _ = timeline.process(incomingEvent: event)
@@ -102,7 +102,7 @@ public class Analytics {
     ///   - event: An event conforming to RawEvent that will be processed.
     public func process(event: RawEvent) {
         guard enabled == true else { return }
-        guard dataCollectionEnabled else { return }
+        guard mayCollect(event) else { return }
         switch event {
         case let e as TrackEvent:
             timeline.process(incomingEvent: e)
@@ -117,6 +117,12 @@ public class Analytics {
         default:
             break
         }
+    }
+
+    /// While data collection is off, the only event let through is the request to delete this
+    /// device's record.
+    private func mayCollect(_ event: RawEvent) -> Bool {
+        return dataCollectionEnabled || DeviceDeletionRequest.matches(event)
     }
 }
 

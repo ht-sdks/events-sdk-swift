@@ -10,6 +10,7 @@ public final class HightouchPush {
 
     private static let apnsTokenKey = "com.hightouch.push.apnsToken"
     private static let lastTokenUploadAtKey = "com.hightouch.push.lastTokenUploadAt"
+    private static let deletionSentKey = "com.hightouch.push.deletionSent"
 
     // NOTE: Thread safety — these static vars are not synchronized. In practice, identify(),
     // logout(), and register() are called from single callsites (login button, logout button,
@@ -340,6 +341,10 @@ extension HightouchPush {
             ])
         }
 
+        resetLocalUser()
+    }
+
+    private static func resetLocalUser() {
         // No messages sync: the new anonymous id's inbox is always empty.
         _currentUserId = nil
         analytics.reset()
@@ -377,12 +382,59 @@ extension HightouchPush {
         let wasEnabled = analytics.dataCollectionEnabled
         analytics.dataCollectionEnabled = enabled
         guard enabled, !wasEnabled else { return }
+        UserDefaults.standard.removeObject(forKey: deletionSentKey)
         // Registrations, identifies and logouts made while off were dropped, so send the current
         // state rather than waiting for the heartbeat. The forced register also flushes and syncs
         // messages.
         guard let token = _apnsToken else { return }
         _forceUploadNextRegister = true
         register(token: token)
+    }
+}
+
+extension HightouchPush {
+
+    /// Stop collecting data, ask Hightouch to delete this device's record, and log the user out.
+    /// Use it when the user asks for their data to be removed. To only pause collection and keep
+    /// the user, call `setDataCollectionEnabled(false)` instead.
+    ///
+    /// 1. Turns data collection off and stores that choice, as `setDataCollectionEnabled(false)` does.
+    /// 2. Sends track("CEP Push Token Events") with provider_event_type "deleted" for the current
+    ///    user, so Hightouch deletes its record of this device. It goes out with the next upload,
+    ///    and is sent once: calling `wipeData()` again sends nothing until collection is turned
+    ///    back on.
+    /// 3. Logs out locally like `logout()`, without sending a "disabled" event: clears the user id
+    ///    and generates a new anonymousId.
+    ///
+    /// To resume, call `setDataCollectionEnabled(true)` and then `identify`.
+    ///
+    /// It does not delete events already delivered to your warehouse or the messages cached on
+    /// this device, and it does not change the device ID.
+    public static func wipeData() {
+        analytics.dataCollectionEnabled = false
+        sendDeletionOncePerOffPeriod()
+        resetLocalUser()
+        UserDefaults.standard.removeObject(forKey: lastTokenUploadAtKey)
+    }
+
+    private static func sendDeletionOncePerOffPeriod() {
+        guard !UserDefaults.standard.bool(forKey: deletionSentKey) else { return }
+        // The event would be dropped, so leave the flag unset and let a later call send it.
+        guard analytics.enabled else { return }
+
+        var properties: [String: Any] = [
+            DeviceDeletionRequest.eventTypeProperty: CepEventTracking.tokenDeleted,
+            "platform": "ios",
+        ]
+        if let token = _apnsToken {
+            properties["token"] = hexEncode(token)
+        }
+        if let userId = _currentUserId {
+            properties["userId"] = userId
+        }
+        CepEventTracking.track(name: CepEventTracking.pushTokenEvents, properties: properties)
+        UserDefaults.standard.set(true, forKey: deletionSentKey)
+        analytics.flush()
     }
 }
 
