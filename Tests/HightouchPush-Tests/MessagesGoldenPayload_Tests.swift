@@ -364,6 +364,85 @@ final class MessagesGoldenPayload_Tests: XCTestCase {
         XCTAssertEqual(storedRows?[3149]?["price"]?.decimalValue, Decimal(string: "3149.5"))
     }
 
+    // MARK: - Boolean condition
+
+    private let conditionOnPayload = MessagesGoldenPayload_Tests.embeddedMessage(
+        id: "msg_condition_001",
+        elements: """
+        [
+          { "tag": "headline", "elementType": "Text", "text": "Sale" },
+          { "tag": "is_holiday", "elementType": "BooleanCondition", "text": "true" },
+          { "tag": "holiday_banner", "elementType": "Text", "text": "Happy holidays" },
+          { "tag": "snow", "elementType": "Toggle", "text": "true" },
+          { "tag": "footer", "elementType": "Text", "text": "Ends Sunday" }
+        ]
+        """
+    )
+
+    private let conditionOffPayload = MessagesGoldenPayload_Tests.embeddedMessage(
+        id: "msg_condition_001",
+        elements: """
+        [
+          { "tag": "headline", "elementType": "Text", "text": "Sale" },
+          { "tag": "footer", "elementType": "Text", "text": "Ends Sunday" }
+        ]
+        """
+    )
+
+    private func element(_ tag: String, in message: HightouchMessage) -> JSON? {
+        guard case .array(let elements)? = message.content?["elements"] else { return nil }
+        return elements.first { $0["tag"]?.stringValue == tag }
+    }
+
+    private func tags(in message: HightouchMessage) -> [String?] {
+        guard case .array(let elements)? = message.content?["elements"] else { return [] }
+        return elements.map { $0["tag"]?.stringValue }
+    }
+
+    func testBooleanConditionOnSendsItsElementAndItsFieldsAsSiblings() throws {
+        let response = try MessagesFetchResponse.parse(XCTUnwrap(conditionOnPayload.data(using: .utf8)))
+        XCTAssertEqual(response.malformedCount, 0)
+        let message = try XCTUnwrap(response.messages.first)
+        let stored = try storeAndReadBack(message, in: try makeStore())
+
+        XCTAssertEqual(tags(in: stored), ["headline", "is_holiday", "holiday_banner", "snow", "footer"])
+        XCTAssertEqual(
+            element("is_holiday", in: stored),
+            .object(["tag": .string("is_holiday"), "elementType": .string("BooleanCondition"), "text": .string("true")])
+        )
+        XCTAssertEqual(element("holiday_banner", in: stored)?["text"]?.stringValue, "Happy holidays")
+        XCTAssertEqual(element("snow", in: stored)?["text"]?.stringValue, "true")
+        XCTAssertEqual(stored.raw, message.raw)
+    }
+
+    func testBooleanConditionOffOmitsItsElementAndItsFields() throws {
+        let response = try MessagesFetchResponse.parse(XCTUnwrap(conditionOffPayload.data(using: .utf8)))
+        XCTAssertEqual(response.malformedCount, 0)
+        let message = try XCTUnwrap(response.messages.first)
+        let stored = try storeAndReadBack(message, in: try makeStore())
+
+        XCTAssertEqual(tags(in: stored), ["headline", "footer"])
+        for absent in ["is_holiday", "holiday_banner", "snow"] {
+            XCTAssertNil(element(absent, in: stored), absent)
+        }
+        XCTAssertEqual(element("footer", in: stored)?["text"]?.stringValue, "Ends Sunday")
+        XCTAssertEqual(stored.raw, message.raw)
+    }
+
+    func testTurningABooleanConditionOffRemovesItsElementsFromTheStoredMessage() throws {
+        let store = try makeStore()
+        let owner = MessageOwner(kind: .userId, id: "alice")
+        let on = try MessagesFetchResponse.parse(XCTUnwrap(conditionOnPayload.data(using: .utf8))).messages
+        let off = try MessagesFetchResponse.parse(XCTUnwrap(conditionOffPayload.data(using: .utf8))).messages
+
+        try replaceAllSync(store, on, owner: owner)
+        let outcome = try replaceAllSync(store, off, owner: owner)
+
+        XCTAssertEqual(outcome.updatedIds, ["msg_condition_001"], "the app is only told to re-render when the message is reported as updated")
+        let stored = try XCTUnwrap(store.message(withId: "msg_condition_001", owner: owner))
+        XCTAssertEqual(tags(in: stored), ["headline", "footer"])
+    }
+
     // 200 messages per chunk.
 
     func testBareObjectEnvelopeThrowsRatherThanParsingAsEmpty() throws {
