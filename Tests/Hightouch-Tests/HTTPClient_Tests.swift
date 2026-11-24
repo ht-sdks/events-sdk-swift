@@ -35,7 +35,7 @@ class HTTPClientTests: XCTestCase {
             destination.flush()
             wait(for: [finished], timeout: 30)
 
-            let retryable = [0, 302, 401, 403, 404, 408, 429, 500, 503].contains(status)
+            let retryable = [0, 302, 408, 429, 500, 503].contains(status)
             XCTAssertEqual(FileManager.default.fileExists(atPath: file.path), retryable, "HTTP \(status)")
         }
     }
