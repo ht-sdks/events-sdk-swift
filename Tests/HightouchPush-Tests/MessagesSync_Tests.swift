@@ -498,6 +498,25 @@ final class MessagesSync_Tests: XCTestCase {
         XCTAssertEqual(StubMessagesURLProtocol.requestCount, 0)
     }
 
+    // MARK: - Data collection off, no fetch
+
+    func testDataCollectionOffMeansNoHTTPRequestEvenWhenForced() throws {
+        let store = try makeStore()
+        let analytics = Analytics(
+            configuration: Configuration(writeKey: "\(name)-collection-off").dataCollectionEnabledByDefault(false)
+        )
+        let owner = MessageOwner(kind: .userId, id: "alice-\(name)")
+        let coordinator = makeCoordinator(analytics: analytics, store: store, ownerProvider: { _ in owner })
+        StubMessagesURLProtocol.enqueue(status: 200, body: try messagesBody(["m1"]))
+
+        let result = try syncSync(coordinator, force: true)
+
+        guard case .success(let change) = result else { return XCTFail("collection off must report success/no-op, not failure") }
+        XCTAssertTrue(change.insertedIds.isEmpty && change.updatedIds.isEmpty && change.removedIds.isEmpty)
+        XCTAssertEqual(StubMessagesURLProtocol.requestCount, 0)
+        XCTAssertEqual(totalRowCount(store), 0)
+    }
+
     // MARK: - Identity changes
 
     func testCooldownIsPerOwner() throws {

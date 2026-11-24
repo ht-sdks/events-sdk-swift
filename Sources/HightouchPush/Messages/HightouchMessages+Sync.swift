@@ -17,7 +17,8 @@ extension HightouchMessages {
 
     /// Fetches the latest messages from the server and reconciles the local cache.
     ///
-    /// Completes with `.unchanged` and makes no network call when there's no user, no store, or no
+    /// Completes with `.unchanged` and makes no network call when data collection is off (see
+    /// `HightouchPush.setDataCollectionEnabled(_:)`), or there's no user, no store, or no
     /// registered APNs token. `completion` is delivered on the main queue. `force: true` bypasses
     /// `HightouchMessagesConfig.foregroundSyncCooldown`.
     public static func sync(force: Bool = false, completion: ((HightouchSyncOutcome) -> Void)? = nil) {

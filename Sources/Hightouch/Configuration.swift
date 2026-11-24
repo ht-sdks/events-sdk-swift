@@ -28,6 +28,7 @@ public class Configuration {
         var requestFactory: ((URLRequest) -> URLRequest)? = nil
         var errorHandler: ((Error) -> Void)? = nil
         var flushPolicies: [FlushPolicy] = [CountBasedFlushPolicy(), IntervalBasedFlushPolicy()]
+        var dataCollectionEnabledByDefault: Bool = true
     }
     
     internal var values: Values
@@ -202,6 +203,18 @@ public extension Configuration {
     @discardableResult
     func flushPolicies(_ policies: [FlushPolicy]) -> Configuration {
         values.flushPolicies = policies
+        return self
+    }
+
+    /// Whether events are collected before the app has chosen with
+    /// `HightouchPush.setDataCollectionEnabled(_:)` on this install. Once that has been called,
+    /// the stored choice wins over this value on every launch.
+    ///
+    /// - Parameter enabled: Pass `false` to collect nothing until the app turns collection on. Defaults to `true`.
+    /// - Returns: The current Configuration.
+    @discardableResult
+    func dataCollectionEnabledByDefault(_ enabled: Bool) -> Configuration {
+        values.dataCollectionEnabledByDefault = enabled
         return self
     }
 }

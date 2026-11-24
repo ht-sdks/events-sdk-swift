@@ -103,4 +103,79 @@ final class HightouchPushRegisterIntegration_Tests: XCTestCase {
         XCTAssertEqual(uploadCount, 2, "identify() must force a re-dispatch despite the TTL window")
     }
     #endif
+
+    // MARK: - Data collection switch
+
+    private var lastUploadedTokenEvent: TrackEvent? {
+        output.events.compactMap { $0 as? TrackEvent }
+            .last { $0.event == "CEP Push Token Events" }
+    }
+
+    func testDataCollectionIsOnByDefault() {
+        XCTAssertTrue(HightouchPush.isDataCollectionEnabled)
+    }
+
+    func testConfigurationDefaultOfOffStartsWithCollectionOff() {
+        HightouchPush.initialize(
+            configuration: Configuration(writeKey: "\(name)-reg-integration")
+                .dataCollectionEnabledByDefault(false),
+            config: HightouchPushConfig(appId: "reg-integration-app")
+        )
+
+        XCTAssertFalse(HightouchPush.isDataCollectionEnabled)
+    }
+
+    func testTurningCollectionOffSendsNothingAndKeepsTheUser() {
+        HightouchPush.register(token: tokenA)
+        HightouchPush.identify(userId: "reg-integration-user")
+        let eventsBefore = output.events.count
+
+        HightouchPush.setDataCollectionEnabled(false)
+
+        XCTAssertFalse(HightouchPush.isDataCollectionEnabled)
+        XCTAssertEqual(output.events.count, eventsBefore, "turning collection off must not send an event")
+        XCTAssertEqual(HightouchPush.userId, "reg-integration-user")
+    }
+
+    func testTokenRegisteredWhileCollectionIsOffIsNotStampedAsUploaded() {
+        HightouchPush.setDataCollectionEnabled(false)
+
+        HightouchPush.register(token: tokenA)
+
+        XCTAssertEqual(uploadCount, 0, "nothing may be dispatched while collection is off")
+        XCTAssertEqual(stamp, 0, "and a dropped registration must not count as an upload")
+        XCTAssertEqual(HightouchPush.deviceTokenHex, "01020304", "the token is still recorded locally")
+    }
+
+    func testTurningCollectionBackOnRegistersTheTokenForTheUserIdentifiedWhileOff() {
+        HightouchPush.register(token: tokenA)
+        XCTAssertEqual(uploadCount, 1)
+        HightouchPush.setDataCollectionEnabled(false)
+        HightouchPush.identify(userId: "reg-integration-user")
+
+        HightouchPush.setDataCollectionEnabled(true)
+
+        XCTAssertEqual(uploadCount, 2, "turning collection on must re-register despite the TTL window")
+        XCTAssertEqual(lastUploadedTokenEvent?.userId, "reg-integration-user")
+        XCTAssertEqual(lastUploadedTokenEvent?.properties?.dictionaryValue?["provider_event_type"] as? String, "registered")
+        XCTAssertGreaterThan(stamp, 0)
+    }
+
+    func testTurningCollectionOnWhenAlreadyOnSendsNothing() {
+        HightouchPush.register(token: tokenA)
+        XCTAssertEqual(uploadCount, 1)
+
+        HightouchPush.setDataCollectionEnabled(true)
+
+        XCTAssertEqual(uploadCount, 1)
+    }
+
+    func testTurningCollectionOnWithoutATokenSendsNothing() {
+        HightouchPush.setDataCollectionEnabled(false)
+
+        HightouchPush.setDataCollectionEnabled(true)
+
+        XCTAssertTrue(HightouchPush.isDataCollectionEnabled)
+        XCTAssertEqual(uploadCount, 0)
+    }
 }
