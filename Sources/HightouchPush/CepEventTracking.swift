@@ -37,12 +37,15 @@ enum CepEventTracking {
 
     /// Properties attached to every CEP event.
     static func baseProperties(channel: Channel = .push) -> [String: Any] {
-        [
+        var properties: [String: Any] = [
             "channel_type": channel.rawValue,
             "_ht_cep_source": channel.source,
             "app_id": HightouchPush.appId,
-            "device_id": HightouchPush.deviceId,
         ]
+        if let deviceId = HightouchPush.deviceId {
+            properties["device_id"] = deviceId
+        }
+        return properties
     }
 
     /// Track a CEP event with base properties merged in.

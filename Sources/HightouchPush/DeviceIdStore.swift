@@ -18,7 +18,10 @@ final class DeviceIdStore {
     }
 
     /// Returns the stored ID, minting and storing one if none exists.
-    func getOrCreate() -> String {
+    ///
+    /// `nil` while a stored ID exists but cannot be read, as after a restart before the first
+    /// unlock: minting then would report this install under a second ID.
+    func getOrCreate() -> String? {
         lock.lock()
         defer { lock.unlock() }
         if let cached {
@@ -29,12 +32,21 @@ final class DeviceIdStore {
         return deviceId
     }
 
-    private func loadOrMint() -> String {
+    private func loadOrMint() -> String? {
         let minted = UUID().uuidString
         do {
             let url = try fileURL()
-            if let stored = try? String(contentsOf: url, encoding: .utf8), !stored.isEmpty {
-                return stored
+            if FileManager.default.fileExists(atPath: url.path) {
+                let stored: String
+                do {
+                    stored = try String(contentsOf: url, encoding: .utf8)
+                } catch {
+                    print("[HightouchPush] Could not read the device ID; events omit it until it is readable: \(error)")
+                    return nil
+                }
+                if !stored.isEmpty {
+                    return stored
+                }
             }
             try minted.write(to: url, atomically: true, encoding: .utf8)
             MessageStoreLocation.excludeFromBackup(url)

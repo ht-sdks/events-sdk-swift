@@ -26,7 +26,7 @@ final class HightouchPushDeviceId_Tests: XCTestCase {
         let first = try makeStore(at: url).getOrCreate()
         let afterRestart = try makeStore(at: url).getOrCreate()
 
-        XCTAssertFalse(first.isEmpty)
+        XCTAssertNotNil(first)
         XCTAssertEqual(first, afterRestart)
     }
 
@@ -37,14 +37,30 @@ final class HightouchPushDeviceId_Tests: XCTestCase {
         try FileManager.default.removeItem(at: url)
         let afterUninstall = try makeStore(at: url).getOrCreate()
 
-        XCTAssertFalse(afterUninstall.isEmpty)
+        XCTAssertNotNil(afterUninstall)
         XCTAssertNotEqual(first, afterUninstall)
+    }
+
+    func testNoDeviceIdIsMintedWhileTheStoredOneCannotBeRead() throws {
+        let url = temporaryFileURL()
+        let stored = try makeStore(at: url).getOrCreate()
+        let readableCopy = url.appendingPathExtension("copy")
+        try FileManager.default.moveItem(at: url, to: readableCopy)
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: false)
+        let store = try makeStore(at: url)
+
+        XCTAssertNil(store.getOrCreate())
+
+        try FileManager.default.removeItem(at: url)
+        try FileManager.default.moveItem(at: readableCopy, to: url)
+        XCTAssertEqual(store.getOrCreate(), stored)
     }
 
     func testDeviceIdStaysStableForTheProcessWhenItCannotBeStored() {
         struct NoDirectory: Error {}
         let store = DeviceIdStore(fileURL: { throw NoDirectory() })
 
+        XCTAssertNotNil(store.getOrCreate())
         XCTAssertEqual(store.getOrCreate(), store.getOrCreate())
     }
 
