@@ -41,6 +41,7 @@ enum CepEventTracking {
             "channel_type": channel.rawValue,
             "_ht_cep_source": channel.source,
             "app_id": HightouchPush.appId,
+            "device_id": HightouchPush.deviceId,
         ]
     }
 
