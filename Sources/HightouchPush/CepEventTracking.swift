@@ -1,9 +1,10 @@
 import Foundation
+@_spi(HightouchInternal) import Hightouch
 
 /// Shared CEP event constants and track helper.
 enum CepEventTracking {
 
-    static let pushTokenEvents = "CEP Push Token Events"
+    static let pushTokenEvents = DeviceDeletionRequest.eventName
     static let engagementEvents = "CEP Engagement Events"
 
     /// The channel an event belongs to. Sent as `channel_type`; also selects `_ht_cep_source`.
@@ -25,6 +26,8 @@ enum CepEventTracking {
     /// need to repeat "Push Token".
     static let tokenRegistered = "registered"
     static let tokenDisabled = "disabled"
+    /// Core lets this one type through while data collection is off, so it is defined there.
+    static let tokenDeleted = DeviceDeletionRequest.eventType
     /// Canonical event type value sent on the wire.
     static let pushOpened = "opened"
     static let pushDelivered = "delivered"

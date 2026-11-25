@@ -126,4 +126,66 @@ final class DataCollection_Tests: XCTestCase {
 
         XCTAssertTrue(analytics.hasUnsentEvents)
     }
+
+    private func trackTokenEvent(_ analytics: Analytics, type: String) {
+        analytics.track(
+            name: DeviceDeletionRequest.eventName,
+            properties: [DeviceDeletionRequest.eventTypeProperty: type]
+        )
+    }
+
+    private func tokenEventTypes(_ output: OutputReaderPlugin) -> [String] {
+        output.events.compactMap {
+            ($0 as? TrackEvent)?.properties?.dictionaryValue?[DeviceDeletionRequest.eventTypeProperty] as? String
+        }
+    }
+
+    func testDeviceDeletionRequestIsTheOnlyEventDeliveredWhileOff() {
+        let (analytics, output) = makeAnalytics(enabledByDefault: false)
+
+        trackTokenEvent(analytics, type: "registered")
+        trackTokenEvent(analytics, type: "disabled")
+        analytics.track(name: "deleted")
+        trackTokenEvent(analytics, type: DeviceDeletionRequest.eventType)
+
+        XCTAssertEqual(tokenEventTypes(output), ["deleted"])
+        XCTAssertEqual(output.events.count, 1)
+    }
+
+    func testDeviceDeletionRequestHeldAtStartupIsDeliveredWithCollectionOff() throws {
+        let (analytics, output) = makeAnalytics(enabledByDefault: false)
+        let startupQueue = try XCTUnwrap(analytics.find(pluginType: StartupQueue.self))
+        let system: System = try XCTUnwrap(analytics.store.currentState())
+
+        startupQueue.running = false
+        trackTokenEvent(analytics, type: DeviceDeletionRequest.eventType)
+        XCTAssertTrue(output.events.isEmpty)
+
+        startupQueue.runningUpdate(state: system)
+
+        XCTAssertEqual(tokenEventTypes(output), ["deleted"])
+    }
+
+    func testEventHeldAtStartupIsDroppedWhenCollectionGoesOffBeforeStartupFinishes() throws {
+        let (analytics, output) = makeAnalytics()
+        let startupQueue = try XCTUnwrap(analytics.find(pluginType: StartupQueue.self))
+        let system: System = try XCTUnwrap(analytics.store.currentState())
+
+        startupQueue.running = false
+        analytics.track(name: "held at startup")
+        analytics.dataCollectionEnabled = false
+
+        startupQueue.runningUpdate(state: system)
+
+        XCTAssertTrue(output.events.isEmpty)
+    }
+
+    func testKillSwitchDropsDeviceDeletionRequest() {
+        let (analytics, output) = makeAnalytics()
+
+        analytics.enabled = false
+        trackTokenEvent(analytics, type: DeviceDeletionRequest.eventType)
+
+        XCTAssertTrue(output.events.isEmpty)
+    }
 }

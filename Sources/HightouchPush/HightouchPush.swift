@@ -340,6 +340,10 @@ extension HightouchPush {
             ])
         }
 
+        resetLocalUser()
+    }
+
+    private static func resetLocalUser() {
         // No messages sync: the new anonymous id's inbox is always empty.
         _currentUserId = nil
         analytics.reset()
@@ -368,7 +372,8 @@ extension HightouchPush {
     ///
     /// Turning it on registers the APNs token again, for the current user if one is identified.
     ///
-    /// Turning it off does not remove the push registration Hightouch already holds for this device.
+    /// Turning it off does not remove the push registration Hightouch already holds for this device;
+    /// call `wipeData()` to ask Hightouch to delete it.
     public static func setDataCollectionEnabled(_ enabled: Bool) {
         guard isInitialized else {
             assertionFailure("[HightouchPush] Call initialize() before using the SDK.")
@@ -383,6 +388,55 @@ extension HightouchPush {
         guard let token = _apnsToken else { return }
         _forceUploadNextRegister = true
         register(token: token)
+    }
+}
+
+extension HightouchPush {
+
+    /// Stop collecting data, ask Hightouch to delete this device's record, and log the user out.
+    /// Use it when the user asks for their data to be removed. To only pause collection and keep
+    /// the user, call `setDataCollectionEnabled(false)` instead.
+    ///
+    /// 1. Turns data collection off and stores that choice, as `setDataCollectionEnabled(false)` does.
+    /// 2. Sends track("CEP Push Token Events") with provider_event_type "deleted" for the current
+    ///    user, so Hightouch deletes its record of this device.
+    /// 3. Logs out locally like `logout()`, without sending a "disabled" event: clears the user id
+    ///    and generates a new anonymousId.
+    ///
+    /// To resume, call `setDataCollectionEnabled(true)` and then `identify`.
+    ///
+    /// It does not delete events already delivered to your warehouse or the messages cached on
+    /// this device, and it does not change the device ID.
+    public static func wipeData() {
+        guard isInitialized else {
+            assertionFailure("[HightouchPush] Call initialize() before using the SDK.")
+            return
+        }
+        analytics.dataCollectionEnabled = false
+        sendDeletion()
+        resetLocalUser()
+        UserDefaults.standard.removeObject(forKey: lastTokenUploadAtKey)
+    }
+
+    private static func sendDeletion() {
+        guard analytics.enabled else { return }
+
+        let deviceId = HightouchPush.deviceId
+        let token = _apnsToken
+        guard deviceId != nil || token != nil else { return }
+
+        var properties: [String: Any] = [
+            DeviceDeletionRequest.eventTypeProperty: CepEventTracking.tokenDeleted,
+            "platform": "ios",
+        ]
+        if let token {
+            properties["token"] = hexEncode(token)
+        }
+        if let userId = _currentUserId {
+            properties["userId"] = userId
+        }
+        CepEventTracking.track(name: CepEventTracking.pushTokenEvents, properties: properties)
+        analytics.flush()
     }
 }
 
