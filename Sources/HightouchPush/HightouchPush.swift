@@ -23,6 +23,11 @@ public final class HightouchPush {
     static var silentPushDelegate: (any HightouchSilentPushDelegate)? { _config?.silentPushDelegate }
     static var allowedProtocols: [String] { _config?.allowedProtocols ?? [] }
     static var appId: String { _config?.appId ?? "" }
+
+    /// This install's device ID, or `nil` while the stored one cannot be read. Unlike the user and
+    /// the token, `identify` and `logout` do not change it.
+    static var deviceId: String? { deviceIdStore.getOrCreate() }
+    static var deviceIdStore: DeviceIdStore = .shared
     static var tokenUploadInterval: TimeInterval {
         _config?.tokenUploadInterval ?? HightouchPushConfig.defaultTokenUploadInterval
     }

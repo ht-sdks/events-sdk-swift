@@ -39,6 +39,14 @@ enum MessageStoreLocation {
     static func messagesDirectory(
         excludeFromBackup: (URL) -> Void = MessageStoreLocation.excludeFromBackup
     ) throws -> URL {
+        let directory = try hightouchDirectory().appendingPathComponent("Messages")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        excludeFromBackup(directory)
+        return directory
+    }
+
+    /// `<Application Support>/Hightouch/`, scoped to the app as described on `messagesDirectory`.
+    static func hightouchDirectory() throws -> URL {
         let base = try FileManager.default.url(
             for: .applicationSupportDirectory,
             in: .userDomainMask,
@@ -51,12 +59,8 @@ enum MessageStoreLocation {
         root = root.appendingPathComponent(Bundle.main.bundleIdentifier ?? "com.hightouch.sdk")
         #endif
 
-        let directory = root
-            .appendingPathComponent("Hightouch")
-            .appendingPathComponent("Messages")
-
+        let directory = root.appendingPathComponent("Hightouch")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        excludeFromBackup(directory)
         return directory
     }
 
