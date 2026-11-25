@@ -11,7 +11,6 @@ final class HightouchPushRegisterIntegration_Tests: XCTestCase {
 
     private let lastUploadKey = "com.hightouch.push.lastTokenUploadAt"
     private let apnsKey = "com.hightouch.push.apnsToken"
-    private let deletionSentKey = "com.hightouch.push.deletionSent"
     private let tokenA = Data([0x01, 0x02, 0x03, 0x04])
     private let tokenB = Data([0x0a, 0x0b, 0x0c, 0x0d])
     private var output: OutputReaderPlugin!
@@ -22,7 +21,6 @@ final class HightouchPushRegisterIntegration_Tests: XCTestCase {
         // storage isolation) so the SDK reloads state from the cleared defaults.
         UserDefaults.standard.removeObject(forKey: lastUploadKey)
         UserDefaults.standard.removeObject(forKey: apnsKey)
-        UserDefaults.standard.removeObject(forKey: deletionSentKey)
         HightouchPush.initialize(
             configuration: Configuration(writeKey: "\(name)-reg-integration"),
             config: HightouchPushConfig(appId: "reg-integration-app")
@@ -37,7 +35,6 @@ final class HightouchPushRegisterIntegration_Tests: XCTestCase {
         HightouchPush.analytics.storage.hardReset(doYouKnowHowToUseThis: true)
         UserDefaults.standard.removeObject(forKey: lastUploadKey)
         UserDefaults.standard.removeObject(forKey: apnsKey)
-        UserDefaults.standard.removeObject(forKey: deletionSentKey)
         super.tearDown()
     }
 
@@ -231,10 +228,11 @@ final class HightouchPushRegisterIntegration_Tests: XCTestCase {
             .filter { $0.properties?.dictionaryValue?["provider_event_type"] as? String == providerEventType }
     }
 
-    func testWipeDataTurnsCollectionOffSendsOneDeletionForTheUserAndLogsOut() {
+    func testWipeDataTurnsCollectionOffSendsOneDeletionForTheUserAndLogsOut() throws {
         HightouchPush.register(token: tokenA)
         HightouchPush.identify(userId: "reg-integration-user")
         let anonymousIdBefore = HightouchPush.anonymousId
+        let expectedDeviceId = try XCTUnwrap(HightouchPush.deviceId)
 
         HightouchPush.wipeData()
 
@@ -246,7 +244,7 @@ final class HightouchPushRegisterIntegration_Tests: XCTestCase {
         XCTAssertEqual(deletions.count, 1)
         let properties = deletions.first?.properties?.dictionaryValue
         XCTAssertEqual(properties?["token"] as? String, "01020304")
-        XCTAssertEqual(properties?["device_id"] as? String, HightouchPush.deviceId)
+        XCTAssertEqual(properties?["device_id"] as? String, expectedDeviceId)
         XCTAssertEqual(properties?["app_id"] as? String, "reg-integration-app")
         XCTAssertEqual(properties?["userId"] as? String, "reg-integration-user")
         XCTAssertEqual(deletions.first?.userId, "reg-integration-user", "attributed to the user being wiped")
@@ -286,24 +284,25 @@ final class HightouchPushRegisterIntegration_Tests: XCTestCase {
         XCTAssertNotEqual(HightouchPush.anonymousId, anonymousIdBefore)
     }
 
-    func testWipeDataSendsTheDeletionWithoutATokenProperty() {
+    func testWipeDataSendsTheDeletionWithoutATokenProperty() throws {
+        let expectedDeviceId = try XCTUnwrap(HightouchPush.deviceId)
+
         HightouchPush.wipeData()
 
         let deletions = tokenEvents(ofType: "deleted")
         XCTAssertEqual(deletions.count, 1)
         let properties = deletions.first?.properties?.dictionaryValue
         XCTAssertNil(properties?["token"])
-        XCTAssertEqual(properties?["device_id"] as? String, HightouchPush.deviceId)
+        XCTAssertEqual(properties?["device_id"] as? String, expectedDeviceId)
     }
 
-    func testSecondWipeDataSendsNothingMore() {
+    func testRepeatedWipeDataSendsDeletionEachTime() {
         HightouchPush.register(token: tokenA)
         HightouchPush.wipeData()
-        let eventsAfterFirstWipe = output.events.count
 
         HightouchPush.wipeData()
 
-        XCTAssertEqual(output.events.count, eventsAfterFirstWipe)
+        XCTAssertEqual(tokenEvents(ofType: "deleted").count, 2)
     }
 
     func testWipeDataSendsTheDeletionAgainAfterCollectionWasTurnedBackOn() {
@@ -334,9 +333,9 @@ final class HightouchPushRegisterIntegration_Tests: XCTestCase {
         XCTAssertEqual(tokenEvents(ofType: "deleted").count, 1)
     }
 
-    func testWipeDataKeepsTheDeviceId() {
+    func testWipeDataKeepsTheDeviceId() throws {
         HightouchPush.register(token: tokenA)
-        let deviceIdBefore = HightouchPush.deviceId
+        let deviceIdBefore = try XCTUnwrap(HightouchPush.deviceId)
 
         HightouchPush.wipeData()
 
@@ -345,6 +344,32 @@ final class HightouchPushRegisterIntegration_Tests: XCTestCase {
             tokenEvents(ofType: "deleted").first?.properties?.dictionaryValue?["device_id"] as? String,
             deviceIdBefore
         )
+    }
+
+    func testWipeDataWithUnreadableDeviceIdAndNoTokenSendsNothing() {
+        HightouchPush.identify(userId: "reg-integration-user")
+        HightouchPush.deviceIdStore = DeviceIdStore(fileURL: { throw CocoaError(.fileReadNoPermission) })
+        defer { HightouchPush.deviceIdStore = .shared }
+
+        HightouchPush.wipeData()
+
+        XCTAssertFalse(HightouchPush.isDataCollectionEnabled)
+        XCTAssertNil(HightouchPush.userId)
+        XCTAssertTrue(tokenEvents(ofType: "deleted").isEmpty)
+    }
+
+    func testWipeDataWithUnreadableDeviceIdAndTokenStillSendsTokenDeletion() {
+        HightouchPush.register(token: tokenA)
+        HightouchPush.deviceIdStore = DeviceIdStore(fileURL: { throw CocoaError(.fileReadNoPermission) })
+        defer { HightouchPush.deviceIdStore = .shared }
+
+        HightouchPush.wipeData()
+
+        let deletions = tokenEvents(ofType: "deleted")
+        XCTAssertEqual(deletions.count, 1)
+        let properties = deletions.first?.properties?.dictionaryValue
+        XCTAssertEqual(properties?["token"] as? String, "01020304")
+        XCTAssertNil(properties?["device_id"])
     }
 
     func testTurningCollectionOnAfterWipeDataRegistersTheTokenWithNoUser() {
