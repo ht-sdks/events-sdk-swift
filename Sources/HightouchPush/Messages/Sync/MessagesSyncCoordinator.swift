@@ -71,7 +71,7 @@ final class MessagesSyncCoordinator {
     private func begin(force: Bool, updatesCooldown: Bool, completions: [Completion]) {
         // The fetch sends the user id and device token outside the event pipeline, so the gate in
         // Analytics.process doesn't cover it.
-        guard analytics.dataCollectionEnabled else {
+        guard analytics.enabled, analytics.dataCollectionEnabled else {
             deliver(.success(HightouchMessagesChange()), to: completions)
             return
         }
@@ -119,6 +119,10 @@ final class MessagesSyncCoordinator {
     }
 
     private func performFetch(owner: MessageOwner, deviceToken: String, updatesCooldown: Bool, retriesRemaining: Int) {
+        guard analytics.enabled, analytics.dataCollectionEnabled else {
+            finish(.success(HightouchMessagesChange()))
+            return
+        }
         client.fetchMessages(owner: owner, deviceToken: deviceToken) { [weak self] result in
             guard let self = self else { return }
             switch result {

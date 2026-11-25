@@ -178,4 +178,45 @@ final class HightouchPushRegisterIntegration_Tests: XCTestCase {
         XCTAssertTrue(HightouchPush.isDataCollectionEnabled)
         XCTAssertEqual(uploadCount, 0)
     }
+
+    func testDataCollectionChoicePersistsAcrossReinitialization() {
+        HightouchPush.setDataCollectionEnabled(false)
+
+        HightouchPush.initialize(
+            configuration: Configuration(writeKey: "\(name)-reg-integration")
+                .dataCollectionEnabledByDefault(true),
+            config: HightouchPushConfig(appId: "reg-integration-app")
+        )
+
+        XCTAssertFalse(HightouchPush.isDataCollectionEnabled)
+    }
+
+    func testLogoutWhileCollectionIsOffClearsUserLocallyAndReEnablingRegistersAnonymous() {
+        HightouchPush.register(token: tokenA)
+        HightouchPush.identify(userId: "reg-integration-user")
+        let anonymousIdBefore = HightouchPush.anonymousId
+        let eventsBefore = output.events.count
+        HightouchPush.setDataCollectionEnabled(false)
+
+        HightouchPush.logout()
+
+        XCTAssertEqual(output.events.count, eventsBefore, "logout while off must not send a disabled event")
+        XCTAssertNil(HightouchPush.userId)
+        XCTAssertNotEqual(HightouchPush.anonymousId, anonymousIdBefore)
+
+        HightouchPush.setDataCollectionEnabled(true)
+
+        XCTAssertEqual(uploadCount, 2)
+        XCTAssertEqual(lastUploadedTokenEvent?.properties?.dictionaryValue?["provider_event_type"] as? String, "registered")
+        XCTAssertNil(lastUploadedTokenEvent?.userId)
+    }
+
+    func testTokenRegisteredWithKillSwitchOffIsNotStampedAsUploaded() {
+        HightouchPush.analytics.enabled = false
+
+        HightouchPush.register(token: tokenA)
+
+        XCTAssertEqual(uploadCount, 0)
+        XCTAssertEqual(stamp, 0)
+    }
 }

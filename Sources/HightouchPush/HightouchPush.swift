@@ -199,7 +199,7 @@ extension HightouchPush {
         guard shouldUpload else { return }
         // The event would be dropped, so don't record an upload. Turning collection on registers
         // the token again.
-        guard analytics.dataCollectionEnabled else { return }
+        guard analytics.enabled, analytics.dataCollectionEnabled else { return }
 
         UserDefaults.standard.set(now, forKey: lastTokenUploadAtKey)
         CepEventTracking.track(name: CepEventTracking.pushTokenEvents, properties: [
@@ -350,6 +350,10 @@ extension HightouchPush {
 
     /// Whether the SDK collects data. See `setDataCollectionEnabled(_:)`.
     public static var isDataCollectionEnabled: Bool {
+        guard isInitialized else {
+            assertionFailure("[HightouchPush] Call initialize() before using the SDK.")
+            return false
+        }
         return analytics.dataCollectionEnabled
     }
 
@@ -366,6 +370,10 @@ extension HightouchPush {
     ///
     /// Turning it off does not remove the push registration Hightouch already holds for this device.
     public static func setDataCollectionEnabled(_ enabled: Bool) {
+        guard isInitialized else {
+            assertionFailure("[HightouchPush] Call initialize() before using the SDK.")
+            return
+        }
         let wasEnabled = analytics.dataCollectionEnabled
         analytics.dataCollectionEnabled = enabled
         guard enabled, !wasEnabled else { return }

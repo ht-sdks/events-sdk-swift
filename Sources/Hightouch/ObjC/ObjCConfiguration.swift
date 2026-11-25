@@ -168,6 +168,19 @@ public class ObjCConfiguration: NSObject {
         }
     }
 
+    /// Whether events are collected before the app has chosen with
+    /// `HightouchPush.setDataCollectionEnabled(_:)` on this install. Once that has been called,
+    /// the stored choice wins over this value on every launch. Defaults to `true`.
+    @objc
+    public var dataCollectionEnabledByDefault: Bool {
+        get {
+            return configuration.values.dataCollectionEnabledByDefault
+        }
+        set(value) {
+            configuration.dataCollectionEnabledByDefault(value)
+        }
+    }
+
     /// Initialize a configuration object to pass along to an Analytics instance.
     ///
     /// - Parameter writeKey: Your Segment write key value

@@ -116,4 +116,14 @@ final class DataCollection_Tests: XCTestCase {
 
         XCTAssertTrue(output.events.isEmpty)
     }
+
+    func testEventsTrackedBeforeTurningOffRemainQueuedForUpload() {
+        let (analytics, _) = makeAnalytics()
+
+        analytics.track(name: "before off")
+        analytics.dataCollectionEnabled = false
+        analytics.track(name: "while off")
+
+        XCTAssertTrue(analytics.hasUnsentEvents)
+    }
 }
