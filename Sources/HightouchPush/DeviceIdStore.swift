@@ -6,14 +6,14 @@ import Foundation
 /// The file lives in Application Support and is excluded from backup, so restoring a backup or
 /// transferring to another device does not copy the ID. It is separate from `UserDefaults` and
 /// analytics storage, so logout and `reset()` cannot remove it.
-final class DeviceIdStore {
+final class DeviceIdStore: @unchecked Sendable {
     static let shared = DeviceIdStore(fileURL: DeviceIdStore.defaultFileURL)
 
-    private let fileURL: () throws -> URL
+    private let fileURL: @Sendable () throws -> URL
     private let lock = NSLock()
     private var cached: String?
 
-    init(fileURL: @escaping () throws -> URL) {
+    init(fileURL: @escaping @Sendable () throws -> URL) {
         self.fileURL = fileURL
     }
 
@@ -40,6 +40,7 @@ final class DeviceIdStore {
                 let stored: String
                 do {
                     stored = try String(contentsOf: url, encoding: .utf8)
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
                 } catch {
                     print("[HightouchPush] Could not read the device ID; events omit it until it is readable: \(error)")
                     return nil
@@ -48,12 +49,37 @@ final class DeviceIdStore {
                     return stored
                 }
             }
-            try minted.write(to: url, atomically: true, encoding: .utf8)
+
+            #if os(iOS) || os(tvOS) || os(watchOS)
+            let writeOptions: Data.WritingOptions = [.atomic, .completeFileProtectionUntilFirstUserAuthentication]
+            #else
+            let writeOptions: Data.WritingOptions = [.atomic]
+            #endif
+
+            try Data(minted.utf8).write(to: url, options: writeOptions)
             MessageStoreLocation.excludeFromBackup(url)
+        } catch where Self.isPermissionError(error) {
+            print("[HightouchPush] Device ID storage is unavailable; events omit it until readable: \(error)")
+            return nil
         } catch {
             print("[HightouchPush] Could not store the device ID; it will change on the next launch: \(error)")
         }
         return minted
+    }
+
+    private static func isPermissionError(_ error: Error) -> Bool {
+        if let cocoaError = error as? CocoaError,
+           cocoaError.code == .fileReadNoPermission || cocoaError.code == .fileWriteNoPermission {
+            return true
+        }
+        if let posixError = error as? POSIXError,
+           posixError.code == .EPERM || posixError.code == .EACCES {
+            return true
+        }
+        if let underlying = (error as NSError).userInfo[NSUnderlyingErrorKey] as? Error {
+            return isPermissionError(underlying)
+        }
+        return false
     }
 
     /// `<Application Support>/Hightouch/device-id`

@@ -56,6 +56,53 @@ final class HightouchPushDeviceId_Tests: XCTestCase {
         XCTAssertEqual(store.getOrCreate(), stored)
     }
 
+    func testNoDeviceIdIsMintedWhenStorageReturnsPermissionError() throws {
+        let url = temporaryFileURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let stored = try makeStore(at: url).getOrCreate()
+
+        final class Flag: @unchecked Sendable {
+            var locked = true
+        }
+        let flag = Flag()
+        let store = DeviceIdStore(fileURL: {
+            if flag.locked {
+                throw CocoaError(.fileReadNoPermission)
+            }
+            return url
+        })
+
+        XCTAssertNil(store.getOrCreate())
+
+        flag.locked = false
+        XCTAssertEqual(store.getOrCreate(), stored)
+    }
+
+    func testStoredDeviceIdTrimsSurroundingWhitespace() throws {
+        let url = temporaryFileURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        let expected = UUID().uuidString
+        try "  \(expected)\n".write(to: url, atomically: true, encoding: .utf8)
+
+        let store = DeviceIdStore(fileURL: { url })
+        XCTAssertEqual(store.getOrCreate(), expected)
+    }
+
+    #if !os(Linux)
+    func testDeviceIdFileIsExcludedFromBackup() throws {
+        let url = temporaryFileURL()
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+
+        _ = try makeStore(at: url).getOrCreate()
+        let values = try url.resourceValues(forKeys: [.isExcludedFromBackupKey])
+        XCTAssertEqual(values.isExcludedFromBackup, true)
+    }
+    #endif
+
     func testDeviceIdStaysStableForTheProcessWhenItCannotBeStored() {
         struct NoDirectory: Error {}
         let store = DeviceIdStore(fileURL: { throw NoDirectory() })
@@ -72,11 +119,13 @@ final class HightouchPushDeviceId_Tests: XCTestCase {
 
     // MARK: - Events
 
-    func testDeviceIdIsSentOnTokenEventsAndSurvivesLogoutAndUserSwitch() {
+    func testDeviceIdIsSentOnTokenEventsAndSurvivesLogoutAndUserSwitch() throws {
         let apnsKey = "com.hightouch.push.apnsToken"
         let lastUploadKey = "com.hightouch.push.lastTokenUploadAt"
+        let url = temporaryFileURL()
         UserDefaults.standard.removeObject(forKey: apnsKey)
         UserDefaults.standard.removeObject(forKey: lastUploadKey)
+        HightouchPush.deviceIdStore = try makeStore(at: url)
         HightouchPush.initialize(
             configuration: Configuration(writeKey: "\(name)-device-id"),
             config: HightouchPushConfig(appId: "device-id-app")
@@ -85,6 +134,8 @@ final class HightouchPushDeviceId_Tests: XCTestCase {
         HightouchPush.analytics.add(plugin: output)
         waitUntilStarted(analytics: HightouchPush.analytics)
         defer {
+            HightouchPush.deviceIdStore = .shared
+            try? FileManager.default.removeItem(at: url.deletingLastPathComponent())
             HightouchPush.analytics.storage.hardReset(doYouKnowHowToUseThis: true)
             UserDefaults.standard.removeObject(forKey: apnsKey)
             UserDefaults.standard.removeObject(forKey: lastUploadKey)
@@ -94,13 +145,36 @@ final class HightouchPushDeviceId_Tests: XCTestCase {
         HightouchPush.identify(userId: "user-1")
         HightouchPush.logout()
         HightouchPush.identify(userId: "user-2")
+        HightouchPush.identify(userId: "user-3")
+        HightouchPush.register(token: Data([0x05, 0x06, 0x07, 0x08]))
 
+        let expectedDeviceId = try XCTUnwrap(HightouchPush.deviceId)
         let deviceIds = output.events
             .compactMap { $0 as? TrackEvent }
             .filter { $0.event == "CEP Push Token Events" }
             .map { $0.properties?.dictionaryValue?["device_id"] as? String }
-        XCTAssertGreaterThanOrEqual(deviceIds.count, 3)
-        XCTAssertEqual(Set(deviceIds).count, 1)
-        XCTAssertEqual(deviceIds.first, HightouchPush.deviceId)
+        XCTAssertEqual(deviceIds.count, 4)
+        XCTAssertTrue(deviceIds.allSatisfy { $0 == expectedDeviceId })
+    }
+
+    func testDeviceIdIsIncludedInBasePropertiesForPushAndInAppChannels() throws {
+        let url = temporaryFileURL()
+        HightouchPush.deviceIdStore = try makeStore(at: url)
+        defer {
+            HightouchPush.deviceIdStore = .shared
+            try? FileManager.default.removeItem(at: url.deletingLastPathComponent())
+        }
+
+        let expectedDeviceId = try XCTUnwrap(HightouchPush.deviceId)
+        XCTAssertEqual(CepEventTracking.baseProperties(channel: .push)["device_id"] as? String, expectedDeviceId)
+        XCTAssertEqual(CepEventTracking.baseProperties(channel: .inApp)["device_id"] as? String, expectedDeviceId)
+    }
+
+    func testBasePropertiesOmitsDeviceIdWhenStoredIdCannotBeRead() {
+        HightouchPush.deviceIdStore = DeviceIdStore(fileURL: { throw CocoaError(.fileReadNoPermission) })
+        defer { HightouchPush.deviceIdStore = .shared }
+
+        let properties = CepEventTracking.baseProperties(channel: .push)
+        XCTAssertFalse(properties.keys.contains("device_id"))
     }
 }
