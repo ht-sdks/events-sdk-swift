@@ -1,6 +1,6 @@
 import XCTest
 @testable import HightouchPush
-import Hightouch
+@testable @_spi(HightouchInternal) import Hightouch
 
 #if canImport(CoreData) && (os(iOS) || os(macOS) || targetEnvironment(macCatalyst))
 import CoreData
@@ -12,6 +12,7 @@ final class StubMessagesURLProtocol: URLProtocol {
     private(set) static var requestCount = 0
     private(set) static var capturedRequests: [URLRequest] = []
     private(set) static var capturedBodies: [Data?] = []
+    static var onRequest: ((Int) -> Void)?
 
     static func reset() {
         lock.lock(); defer { lock.unlock() }
@@ -20,6 +21,7 @@ final class StubMessagesURLProtocol: URLProtocol {
         requestCount = 0
         capturedRequests = []
         capturedBodies = []
+        onRequest = nil
     }
 
     private static func extractBody(from request: URLRequest) -> Data? {
@@ -52,6 +54,8 @@ final class StubMessagesURLProtocol: URLProtocol {
     override func startLoading() {
         StubMessagesURLProtocol.lock.lock()
         StubMessagesURLProtocol.requestCount += 1
+        let currentCount = StubMessagesURLProtocol.requestCount
+        let onRequest = StubMessagesURLProtocol.onRequest
         StubMessagesURLProtocol.capturedRequests.append(request)
         StubMessagesURLProtocol.capturedBodies.append(StubMessagesURLProtocol.extractBody(from: request))
         let next: (status: Int, body: Data)
@@ -62,6 +66,8 @@ final class StubMessagesURLProtocol: URLProtocol {
             next = StubMessagesURLProtocol.lastResponse
         }
         StubMessagesURLProtocol.lock.unlock()
+
+        onRequest?(currentCount)
 
         let response = HTTPURLResponse(
             url: request.url ?? URL(string: "https://example.com")!,
@@ -494,6 +500,67 @@ final class MessagesSync_Tests: XCTestCase {
 
         let result = try syncSync(coordinator)
         guard case .success(let change) = result else { return XCTFail("no token must report success/no-op, not failure") }
+        XCTAssertTrue(change.insertedIds.isEmpty && change.updatedIds.isEmpty && change.removedIds.isEmpty)
+        XCTAssertEqual(StubMessagesURLProtocol.requestCount, 0)
+    }
+
+    // MARK: - Data collection off, no fetch
+
+    func testDataCollectionOffMeansNoHTTPRequestEvenWhenForced() throws {
+        let store = try makeStore()
+        let analytics = Analytics(
+            configuration: Configuration(writeKey: "\(name)-collection-off").dataCollectionEnabledByDefault(false)
+        )
+        let owner = MessageOwner(kind: .userId, id: "alice-\(name)")
+        let coordinator = makeCoordinator(analytics: analytics, store: store, ownerProvider: { _ in owner })
+        StubMessagesURLProtocol.enqueue(status: 200, body: try messagesBody(["m1"]))
+
+        let result = try syncSync(coordinator, force: true)
+
+        guard case .success(let change) = result else { return XCTFail("collection off must report success/no-op, not failure") }
+        XCTAssertTrue(change.insertedIds.isEmpty && change.updatedIds.isEmpty && change.removedIds.isEmpty)
+        XCTAssertEqual(StubMessagesURLProtocol.requestCount, 0)
+        XCTAssertEqual(totalRowCount(store), 0)
+    }
+
+    func testTurningDataCollectionOffBeforeRetryCancelsRetryHTTPRequest() throws {
+        let store = try makeStore()
+        let analytics = makeAnalytics(writeKey: "\(name)-off-before-retry")
+        defer { analytics.storage.hardReset(doYouKnowHowToUseThis: true) }
+        let owner = MessageOwner(kind: .userId, id: "alice-\(name)")
+        let coordinator = makeCoordinator(analytics: analytics, store: store, ownerProvider: { _ in owner })
+        StubMessagesURLProtocol.enqueue(status: 500, body: Data())
+        StubMessagesURLProtocol.enqueue(status: 200, body: try messagesBody(["m1"]))
+        StubMessagesURLProtocol.onRequest = { count in
+            if count == 1 {
+                analytics.dataCollectionEnabled = false
+            }
+        }
+
+        let result = try syncSync(coordinator, force: true)
+
+        guard case .success(let change) = result else {
+            return XCTFail("turning collection off before retry must report success/no-op, not failure")
+        }
+        XCTAssertTrue(change.insertedIds.isEmpty && change.updatedIds.isEmpty && change.removedIds.isEmpty)
+        XCTAssertEqual(StubMessagesURLProtocol.requestCount, 1, "retry must not fire once collection is turned off")
+        XCTAssertEqual(totalRowCount(store), 0)
+    }
+
+    func testKillSwitchBlocksMessagesSync() throws {
+        let store = try makeStore()
+        let analytics = makeAnalytics(writeKey: "\(name)-kill-switch")
+        defer { analytics.storage.hardReset(doYouKnowHowToUseThis: true) }
+        analytics.enabled = false
+        let owner = MessageOwner(kind: .userId, id: "alice-\(name)")
+        let coordinator = makeCoordinator(analytics: analytics, store: store, ownerProvider: { _ in owner })
+        StubMessagesURLProtocol.enqueue(status: 200, body: try messagesBody(["m1"]))
+
+        let result = try syncSync(coordinator, force: true)
+
+        guard case .success(let change) = result else {
+            return XCTFail("kill switch off must report success/no-op, not failure")
+        }
         XCTAssertTrue(change.insertedIds.isEmpty && change.updatedIds.isEmpty && change.removedIds.isEmpty)
         XCTAssertEqual(StubMessagesURLProtocol.requestCount, 0)
     }

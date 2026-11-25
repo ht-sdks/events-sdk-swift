@@ -175,6 +175,7 @@ extension Storage {
         case settings = "hightouch.settings"
         case sessionState = "hightouch.sessionState"
         case events = "hightouch.events"
+        case dataCollectionEnabled = "hightouch.dataCollectionEnabled"
     }
 }
 

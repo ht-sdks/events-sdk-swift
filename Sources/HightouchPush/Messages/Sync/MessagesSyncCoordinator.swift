@@ -1,5 +1,5 @@
 import Foundation
-import Hightouch
+@_spi(HightouchInternal) import Hightouch
 
 #if canImport(CoreData) && (os(iOS) || os(macOS) || targetEnvironment(macCatalyst))
 import CoreData
@@ -69,6 +69,13 @@ final class MessagesSyncCoordinator {
 
     /// Must be called on `stateQueue`.
     private func begin(force: Bool, updatesCooldown: Bool, completions: [Completion]) {
+        // The fetch sends the user id and device token outside the event pipeline, so the gate in
+        // Analytics.process doesn't cover it.
+        guard analytics.enabled, analytics.dataCollectionEnabled else {
+            deliver(.success(HightouchMessagesChange()), to: completions)
+            return
+        }
+
         // The gateway always answers an anonymous id with an empty inbox.
         guard let owner = ownerProvider(analytics), owner.kind == .userId else {
             deliver(.success(HightouchMessagesChange()), to: completions)
@@ -112,6 +119,10 @@ final class MessagesSyncCoordinator {
     }
 
     private func performFetch(owner: MessageOwner, deviceToken: String, updatesCooldown: Bool, retriesRemaining: Int) {
+        guard analytics.enabled, analytics.dataCollectionEnabled else {
+            finish(.success(HightouchMessagesChange()))
+            return
+        }
         client.fetchMessages(owner: owner, deviceToken: deviceToken) { [weak self] result in
             guard let self = self else { return }
             switch result {

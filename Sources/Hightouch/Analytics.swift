@@ -20,6 +20,7 @@ public class Analytics {
     }
     internal var store: Store
     internal var storage: Storage
+    @Atomic private var dataCollectionEnabledValue: Bool = true
     
     /// Enabled/disables debug logging to trace your data going through the SDK.
     public static var debugLogsEnabled = false
@@ -61,7 +62,10 @@ public class Analytics {
         store = Store()
         storage = Storage(store: self.store, writeKey: configuration.values.writeKey)
         timeline = Timeline()
-        
+
+        let storedDataCollectionChoice: Bool? = storage.read(.dataCollectionEnabled)
+        dataCollectionEnabledValue = storedDataCollectionChoice ?? configuration.values.dataCollectionEnabledByDefault
+
         // provide our default state
         store.provide(state: System.defaultState(configuration: configuration, from: storage))
         store.provide(state: UserInfo.defaultState(from: storage))
@@ -77,6 +81,7 @@ public class Analytics {
     
     internal func process<E: RawEvent>(incomingEvent: E, enrichments: [EnrichmentClosure]? = nil) {
         guard enabled == true else { return }
+        guard dataCollectionEnabled else { return }
         let event = incomingEvent.applyRawEventData(store: store, enrichments: enrichments)
         
         _ = timeline.process(incomingEvent: event)
@@ -97,6 +102,7 @@ public class Analytics {
     ///   - event: An event conforming to RawEvent that will be processed.
     public func process(event: RawEvent) {
         guard enabled == true else { return }
+        guard dataCollectionEnabled else { return }
         switch event {
         case let e as TrackEvent:
             timeline.process(incomingEvent: e)
@@ -131,6 +137,24 @@ extension Analytics {
         }
     }
     
+    /// Whether events are collected. While `false`, every event is dropped when it is tracked; the
+    /// upload pipeline keeps running, so events tracked earlier still upload.
+    ///
+    /// Starts from the choice stored on this device, or from
+    /// `Configuration.dataCollectionEnabledByDefault(_:)` when none is stored. Setting it stores
+    /// the choice, so it survives restarts.
+    ///
+    /// For Hightouch SDK modules only. Apps using the push SDK call
+    /// `HightouchPush.setDataCollectionEnabled(_:)` instead.
+    @_spi(HightouchInternal)
+    public var dataCollectionEnabled: Bool {
+        get { dataCollectionEnabledValue }
+        set(value) {
+            dataCollectionEnabledValue = value
+            storage.write(.dataCollectionEnabled, value: value)
+        }
+    }
+
     /// Returns the anonymousId currently in use.
     public var anonymousId: String {
         if let userInfo: UserInfo = store.currentState() {

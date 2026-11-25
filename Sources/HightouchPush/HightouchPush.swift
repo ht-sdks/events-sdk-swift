@@ -1,5 +1,5 @@
 import Foundation
-import Hightouch
+@_spi(HightouchInternal) import Hightouch
 
 #if os(iOS) || targetEnvironment(macCatalyst)
 import UIKit
@@ -197,6 +197,9 @@ extension HightouchPush {
             interval: tokenUploadInterval
         )
         guard shouldUpload else { return }
+        // The event would be dropped, so don't record an upload. Turning collection on registers
+        // the token again.
+        guard analytics.enabled, analytics.dataCollectionEnabled else { return }
 
         UserDefaults.standard.set(now, forKey: lastTokenUploadAtKey)
         CepEventTracking.track(name: CepEventTracking.pushTokenEvents, properties: [
@@ -340,6 +343,46 @@ extension HightouchPush {
         // No messages sync: the new anonymous id's inbox is always empty.
         _currentUserId = nil
         analytics.reset()
+    }
+}
+
+extension HightouchPush {
+
+    /// Whether the SDK collects data. See `setDataCollectionEnabled(_:)`.
+    public static var isDataCollectionEnabled: Bool {
+        guard isInitialized else {
+            assertionFailure("[HightouchPush] Call initialize() before using the SDK.")
+            return false
+        }
+        return analytics.dataCollectionEnabled
+    }
+
+    /// Turn data collection on or off, typically from a consent prompt. The choice is stored on
+    /// the device and wins over `Configuration.dataCollectionEnabledByDefault(_:)` on every later
+    /// launch. Calling it again with the same value does nothing, so it is safe to call on every
+    /// launch with the current consent answer.
+    ///
+    /// While off, no event leaves the device and embedded messages are not fetched. Events tracked
+    /// before the switch still upload. `identify`, `logout` and the APNs token are still recorded
+    /// locally, and the user and anonymous id are kept.
+    ///
+    /// Turning it on registers the APNs token again, for the current user if one is identified.
+    ///
+    /// Turning it off does not remove the push registration Hightouch already holds for this device.
+    public static func setDataCollectionEnabled(_ enabled: Bool) {
+        guard isInitialized else {
+            assertionFailure("[HightouchPush] Call initialize() before using the SDK.")
+            return
+        }
+        let wasEnabled = analytics.dataCollectionEnabled
+        analytics.dataCollectionEnabled = enabled
+        guard enabled, !wasEnabled else { return }
+        // Registrations, identifies and logouts made while off were dropped, so send the current
+        // state rather than waiting for the heartbeat. The forced register also flushes and syncs
+        // messages.
+        guard let token = _apnsToken else { return }
+        _forceUploadNextRegister = true
+        register(token: token)
     }
 }
 
