@@ -29,37 +29,30 @@ public class StartupQueue: Plugin, Subscriber {
     required init() { }
     
     public func execute<T: RawEvent>(event: T?) -> T? {
-        if running == false, let e = event  {
-            // timeline hasn't started, so queue it up.
-            syncQueue.sync {
-                if queuedEvents.count >= Self.maxSize {
-                    // if we've exceeded the max queue size start dropping events
-                    queuedEvents.removeFirst()
-                }
-                queuedEvents.append(e)
+        guard let event = event, !running else { return event }
+        return syncQueue.sync {
+            // Readiness may have changed while admission waited for the queue.
+            guard !running else { return event }
+            if queuedEvents.count >= Self.maxSize {
+                queuedEvents.removeFirst()
             }
+            queuedEvents.append(event)
             return nil
         }
-        // the timeline has started, so let the event pass.
-        return event
     }
 }
 
 extension StartupQueue {
     internal func runningUpdate(state: System) {
-        running = state.running
-        if state.running {
-            replayEvents()
-        }
-    }
-    
-    internal func replayEvents() {
-        // replay the queued events to the instance of Analytics we're working with.
-        syncQueue.sync {
-            for event in queuedEvents {
-                analytics?.process(event: event)
-            }
+        let pending: [RawEvent] = syncQueue.sync {
+            running = state.running
+            guard running else { return [] }
+            let events = queuedEvents
             queuedEvents.removeAll()
+            return events
+        }
+        for event in pending {
+            analytics?.process(event: event)
         }
     }
 }

@@ -3,6 +3,20 @@ import XCTest
 
 final class Analytics_Tests: XCTestCase {
     
+    func testStartupAdmissionBehindReadyTransition() {
+        let queue = StartupQueue()
+        let event = TrackEvent(event: "early", properties: nil)
+        // Hold both operations at the queue and let readiness take the first turn.
+        queue.syncQueue.suspend()
+        queue.syncQueue.async { queue.running = true }
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.05) {
+            queue.syncQueue.resume()
+        }
+
+        XCTAssertNotNil(queue.execute(event: event))
+        XCTAssertTrue(queue.queuedEvents.isEmpty)
+    }
+
     func testBaseEventCreation() {
         let analytics = Analytics(configuration: Configuration(writeKey: "test"))
         let myDestination = MyDestination()
