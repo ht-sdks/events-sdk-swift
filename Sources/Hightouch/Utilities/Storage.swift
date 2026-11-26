@@ -33,14 +33,13 @@ internal class Storage: Subscriber {
         }
     }
     
-    @discardableResult
-    func write<T: Codable>(_ key: Storage.Constants, value: T?) -> Bool {
+    func write<T: Codable>(_ key: Storage.Constants, value: T?) {
         syncQueue.sync {
             switch key {
             case .events:
                 if let event = value as? RawEvent {
                     let eventStoreFile = currentFile(key)
-                    guard self.storeEvent(toFile: eventStoreFile, event: event) else { return false }
+                    self.storeEvent(toFile: eventStoreFile, event: event)
                     if let flushPolicies = analytics?.configuration.values.flushPolicies {
                         for policy in flushPolicies {
                             policy.updateState(event: event)
@@ -65,7 +64,6 @@ internal class Storage: Subscriber {
                 }
             }
             userDefaults?.synchronize()
-            return true
         }
     }
     
@@ -226,10 +224,6 @@ extension Storage {
         return segmentURL
     }
     
-    var startupDirectory: URL {
-        return eventStorageDirectory().appendingPathComponent("startup", isDirectory: true)
-    }
-
     private func eventsFile(index: Int) -> URL {
         let docs = eventStorageDirectory()
         let fileURL = docs.appendingPathComponent("\(index)-hightouch-events")
@@ -267,13 +261,13 @@ extension Storage {
 // MARK: - Event Storage
 
 extension Storage {
-    private func storeEvent(toFile file: URL, event: RawEvent) -> Bool {
+    private func storeEvent(toFile file: URL, event: RawEvent) {
         let json: Data
         do {
             json = try JSONEncoder().encode(event)
         } catch {
             analytics?.reportInternalError(error)
-            return false
+            return
         }
         var storeFile = file
         
@@ -288,7 +282,7 @@ extension Storage {
                 newFile = try Data(contentsOf: storeFile) == Data(Storage.batchHeader.utf8)
             } catch {
                 analytics?.reportInternalError(error)
-                return false
+                return
             }
             open(file: storeFile)
         }
@@ -305,15 +299,13 @@ extension Storage {
         }
         
         do {
-            guard let stream = outputStream, stream.fileHandle != nil else {
-                throw AnalyticsError.storageUnableToWrite(storeFile.path)
+            if outputStream == nil {
+                Analytics.segmentLog(message: "Storage: Output stream is nil for \(storeFile)", kind: .error)
             }
             let entry = (newFile ? Data() : Data(",".utf8)) + json
-            try stream.write(entry)
-            return true
+            try outputStream?.write(entry)
         } catch {
             analytics?.reportInternalError(error)
-            return false
         }
     }
     

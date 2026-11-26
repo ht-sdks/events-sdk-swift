@@ -108,10 +108,7 @@ public class SegmentDestination: DestinationPlugin, Subscriber {
     private func queueEvent<T: RawEvent>(event: T) {
         guard let storage = self.storage else { return }
         // Send Event to File System
-        guard storage.write(.events, value: event) else {
-            analytics?.find(pluginType: StartupQueue.self)?.writeFailed(messageId: event.messageId)
-            return
-        }
+        storage.write(.events, value: event)
         eventCount += 1
     }
     
