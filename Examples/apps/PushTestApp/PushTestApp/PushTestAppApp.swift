@@ -9,6 +9,8 @@ enum PushTestAppConfig {
     static let apiHostDefaultsKey = "ht_api_host"
     static let appIdDefaultsKey = "ht_app_id"
     static let autoClearBadgeDefaultsKey = "ht_auto_clear_badge_on_foreground"
+    static let apnsTokenDefaultsKey = "ht_apns_token_hex"
+    static let apnsRegistrationErrorDefaultsKey = "ht_apns_registration_error"
 
     /// Values are whitespace-trimmed here so every consumer (isConfigured, the
     /// initialize guard, the settings form) sees the same canonical string.
@@ -35,6 +37,13 @@ enum PushTestAppConfig {
 
     static var autoClearBadgeOnForeground: Bool {
         UserDefaults.standard.bool(forKey: autoClearBadgeDefaultsKey)
+    }
+}
+
+extension Notification.Name {
+    /// Posted on the main thread after APNs registration succeeds or fails.
+    static var pushTestAppRegistrationDidChange: Notification.Name {
+        Notification.Name("PushTestAppRegistrationDidChange")
     }
 }
 
@@ -166,6 +175,9 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         let hex = deviceToken.map { String(format: "%02x", $0) }.joined()
         print("[PushTestApp] APNs token: \(hex)")
         HightouchPush.register(token: deviceToken)
+        UserDefaults.standard.set(hex, forKey: PushTestAppConfig.apnsTokenDefaultsKey)
+        UserDefaults.standard.removeObject(forKey: PushTestAppConfig.apnsRegistrationErrorDefaultsKey)
+        NotificationCenter.default.post(name: .pushTestAppRegistrationDidChange, object: nil)
     }
 
     func application(
@@ -173,6 +185,11 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         didFailToRegisterForRemoteNotificationsWithError error: Error
     ) {
         print("[PushTestApp] Failed to register for remote notifications: \(error)")
+        UserDefaults.standard.set(
+            error.localizedDescription,
+            forKey: PushTestAppConfig.apnsRegistrationErrorDefaultsKey
+        )
+        NotificationCenter.default.post(name: .pushTestAppRegistrationDidChange, object: nil)
     }
 
     // MARK: - Background/Silent Push
