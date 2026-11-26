@@ -43,6 +43,8 @@ public class SegmentDestination: DestinationPlugin, Subscriber {
     internal var httpClient: HTTPClient?
     private var uploads = [UploadTaskInfo]()
     private let uploadsQueue = DispatchQueue(label: "uploadsQueue.hightouch.com")
+    private var retryAt = [URL: TimeInterval]()
+    internal var uptime: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
     private var storage: Storage?
     
     @Atomic internal var eventCount: Int = 0
@@ -129,7 +131,12 @@ public class SegmentDestination: DestinationPlugin, Subscriber {
         analytics.log(message: "Uploads in-progress: \(pendingUploads)")
         
         if pendingUploads == 0 {
-            for url in data {
+            let eligible = uploadsQueue.sync { () -> [URL] in
+                let now = uptime()
+                retryAt = retryAt.filter { $0.value > now }
+                return data.filter { retryAt[$0] == nil }
+            }
+            for url in eligible {
                 analytics.log(message: "Processing Batch:\n\(url.lastPathComponent)")
                 
                 let uploadTask = httpClient.startBatchUpload(writeKey: analytics.configuration.values.writeKey, batch: url) { (result) in
@@ -140,6 +147,11 @@ public class SegmentDestination: DestinationPlugin, Subscriber {
                         case .failure(HTTPClientErrors.statusCode(let code))
                             where (400..<500).contains(code) && code != 408 && code != 429:
                             storage.remove(file: url)
+                        case .failure(HTTPClientErrors.statusCode(let code))
+                            where code == 408 || code == 429 || (500..<600).contains(code):
+                            self.deferUpload(url, interval: analytics.flushInterval)
+                        case .failure(HTTPClientErrors.unknown):
+                            self.deferUpload(url, interval: analytics.flushInterval)
                         default:
                             break
                     }
@@ -164,6 +176,10 @@ public class SegmentDestination: DestinationPlugin, Subscriber {
 // MARK: - Upload management
 
 extension SegmentDestination {
+    private func deferUpload(_ url: URL, interval: TimeInterval) {
+        uploadsQueue.sync { retryAt[url] = uptime() + max(1, interval) }
+    }
+
     internal func cleanupUploads() {
         // lets go through and get rid of any tasks that aren't running.
         // either they were suspended because a background task took too
