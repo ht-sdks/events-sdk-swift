@@ -12,7 +12,7 @@ class HTTPClientTests: XCTestCase {
 
     #if !os(Linux) && !os(watchOS)
     func testFlushDiscardsPermanentFailuresAndRetainsRetryableBatches() throws {
-        for status in [0, 200, 302, 400, 401, 403, 408, 413, 422, 429, 500, 503] {
+        for status in [0, 200, 302, 400, 401, 403, 404, 408, 413, 422, 429, 500, 503] {
             let analytics = Analytics(configuration: Configuration(writeKey: UUID().uuidString)
                 .autoAddSegmentDestination(false).flushPolicies([]))
             defer { analytics.storage.hardReset(doYouKnowHowToUseThis: true) }
@@ -23,17 +23,17 @@ class HTTPClientTests: XCTestCase {
             configuration.httpAdditionalHeaders = ["Test-Status": String(status)]
             let session = URLSession(configuration: configuration)
             defer { session.invalidateAndCancel() }
-            destination.httpClient?.session = session
+            let finished = expectation(description: "Handled HTTP \(status)")
+            let client = ObservedHTTPClient(analytics: analytics)
+            client.session = session
+            client.didHandleResponse = { finished.fulfill() }
+            destination.httpClient = client
             analytics.storage.write(.events, value: IdentifyEvent(userId: "test"))
             let files: [URL] = try XCTUnwrap(analytics.storage.read(.events))
             let file = try XCTUnwrap(files.first)
 
             destination.flush()
-            let finished = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
-                destination.cleanupUploads()
-                return destination.pendingUploads == 0
-            }, object: nil)
-            wait(for: [finished], timeout: 5)
+            wait(for: [finished], timeout: 30)
 
             let retryable = [0, 302, 408, 429, 500, 503].contains(status)
             XCTAssertEqual(FileManager.default.fileExists(atPath: file.path), retryable, "HTTP \(status)")
@@ -63,6 +63,17 @@ class HTTPClientTests: XCTestCase {
 }
 
 #if !os(Linux) && !os(watchOS)
+private class ObservedHTTPClient: HTTPClient {
+    var didHandleResponse: (() -> Void)?
+
+    override func startBatchUpload(writeKey: String, batch: URL, completion: @escaping (Result<Bool, Error>) -> Void) -> URLSessionDataTask? {
+        return super.startBatchUpload(writeKey: writeKey, batch: batch) { result in
+            completion(result)
+            self.didHandleResponse?()
+        }
+    }
+}
+
 private class BatchResponse: URLProtocol {
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
