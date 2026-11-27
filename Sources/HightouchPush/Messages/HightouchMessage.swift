@@ -27,9 +27,13 @@ public struct HightouchMessage: Equatable {
      - `Asset`: a URL string under `mediaUrl`, with an optional `mediaCaption`.
      - `Json`: a parsed object or array under `json`, never a string. Read it with the `JSON`
        accessors, for example `element["json"]?["color"]?.stringValue`.
+     - `BooleanCondition`: the string `"true"` under `text`. The fields the condition groups are
+       separate elements in the same array.
 
-     The server omits a field that has no value, so look elements up by `tag`, treat every tag
-     and key as optional, and skip an `elementType` the app does not know.
+     The server omits a field that has no value. When a Boolean condition is off, the server
+     omits the condition's element and the element of every field the condition groups. Look
+     elements up by `tag`, treat every tag and key as optional, and skip an `elementType` the
+     app does not know.
      */
     public let content: JSON?
     public let raw: JSON
