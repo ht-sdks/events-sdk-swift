@@ -16,6 +16,21 @@ public struct HightouchMessage: Equatable {
     public let triggerType: String?
     public let version: String?
     public let customValues: JSON?
+    /**
+     Opaque JSON from the server. The SDK stores it and returns it without validating it.
+
+     `content["elements"]` is a flat array with one object per template field that has a value.
+     `tag` identifies the field and `elementType` names its type, which decides the key that
+     holds the value:
+
+     - `Text`, `Number`, `Select`, `Toggle`, `Datetime`: a string under `text`.
+     - `Asset`: a URL string under `mediaUrl`, with an optional `mediaCaption`.
+     - `Json`: a parsed object or array under `json`, never a string. Read it with the `JSON`
+       accessors, for example `element["json"]?["color"]?.stringValue`.
+
+     The server omits a field that has no value, so look elements up by `tag`, treat every tag
+     and key as optional, and skip an `elementType` the app does not know.
+     */
     public let content: JSON?
     public let raw: JSON
 

@@ -147,6 +147,223 @@ final class MessagesGoldenPayload_Tests: XCTestCase {
         XCTAssertEqual(elements.count, 4)
     }
 
+    // MARK: - Json elements
+
+    private static func embeddedMessage(id: String, elements: String) -> String {
+        """
+        {
+          "messages": [
+            {
+              "messageType": "embedded",
+              "messageId": "\(id)",
+              "campaignId": "camp_coffee_launch",
+              "createdAt": "2026-08-05T12:00:00.000Z",
+              "expiresAt": "2099-09-05T12:00:00.000Z",
+              "locationId": "home_promo",
+              "version": "1",
+              "variantSlug": "promo_banner",
+              "content": { "elements": \(elements) }
+            }
+          ]
+        }
+        """
+    }
+
+    private let jsonObjectPayload = MessagesGoldenPayload_Tests.embeddedMessage(
+        id: "msg_json_object_001",
+        elements: """
+        [
+          { "tag": "title", "elementType": "Text", "text": "Hi Ada" },
+          {
+            "tag": "style",
+            "elementType": "Json",
+            "json": {
+              "label": "{{ first_name }}",
+              "sizes": [8, 12],
+              "color": "#DD0031",
+              "nested": { "stray": [1, null] }
+            }
+          }
+        ]
+        """
+    )
+
+    private let jsonArrayPayload = MessagesGoldenPayload_Tests.embeddedMessage(
+        id: "msg_json_array_001",
+        elements: """
+        [
+          { "tag": "style", "elementType": "Json", "json": [1, "two"] },
+          { "tag": "corners", "elementType": "Json", "json": [{ "radius": 8 }] },
+          { "tag": "greeting", "elementType": "Json", "json": [{ "greeting": "Hi Ada", "sizes": [8, null, true] }] }
+        ]
+        """
+    )
+
+    private func storeAndReadBack(
+        _ message: HightouchMessage,
+        in store: MessageStore,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws -> HightouchMessage {
+        let owner = MessageOwner(kind: .userId, id: "alice")
+        let first = try replaceAllSync(store, [message], owner: owner)
+        XCTAssertEqual(first.insertedIds, [message.messageId], file: file, line: line)
+        return try XCTUnwrap(store.message(withId: message.messageId, owner: owner), file: file, line: line)
+    }
+
+    func testJsonObjectElementReachesTheAppAsParsedJson() throws {
+        let response = try MessagesFetchResponse.parse(XCTUnwrap(jsonObjectPayload.data(using: .utf8)))
+        XCTAssertEqual(response.malformedCount, 0)
+        let message = try XCTUnwrap(response.messages.first)
+
+        let expectedContent: JSON = .object([
+            "elements": .array([
+                .object(["tag": .string("title"), "elementType": .string("Text"), "text": .string("Hi Ada")]),
+                .object([
+                    "tag": .string("style"),
+                    "elementType": .string("Json"),
+                    "json": .object([
+                        "label": .string("{{ first_name }}"),
+                        "sizes": .array([.number(8), .number(12)]),
+                        "color": .string("#DD0031"),
+                        "nested": .object(["stray": .array([.number(1), .null])])
+                    ])
+                ])
+            ])
+        ])
+        XCTAssertEqual(message.content, expectedContent)
+
+        let style = try XCTUnwrap(message.content?["elements"]?[1])
+        XCTAssertEqual(style["elementType"]?.stringValue, "Json")
+        XCTAssertNil(style["text"], "a Json element carries its value under `json`, not `text`")
+        XCTAssertEqual(style["json"]?["label"]?.stringValue, "{{ first_name }}")
+        XCTAssertEqual(style["json"]?["sizes"]?[1]?.intValue, 12)
+
+        let stored = try storeAndReadBack(message, in: try makeStore())
+        XCTAssertEqual(stored.content, expectedContent)
+        XCTAssertEqual(stored.raw, message.raw)
+    }
+
+    func testJsonArrayElementReachesTheAppAsParsedJson() throws {
+        let response = try MessagesFetchResponse.parse(XCTUnwrap(jsonArrayPayload.data(using: .utf8)))
+        XCTAssertEqual(response.malformedCount, 0)
+        let message = try XCTUnwrap(response.messages.first)
+
+        let expectedContent: JSON = .object([
+            "elements": .array([
+                .object([
+                    "tag": .string("style"),
+                    "elementType": .string("Json"),
+                    "json": .array([.number(1), .string("two")])
+                ]),
+                .object([
+                    "tag": .string("corners"),
+                    "elementType": .string("Json"),
+                    "json": .array([.object(["radius": .number(8)])])
+                ]),
+                .object([
+                    "tag": .string("greeting"),
+                    "elementType": .string("Json"),
+                    "json": .array([
+                        .object([
+                            "greeting": .string("Hi Ada"),
+                            "sizes": .array([.number(8), .null, .bool(true)])
+                        ])
+                    ])
+                ])
+            ])
+        ])
+        XCTAssertEqual(message.content, expectedContent)
+        XCTAssertEqual(message.content?["elements"]?[0]?["json"]?[1]?.stringValue, "two")
+
+        let stored = try storeAndReadBack(message, in: try makeStore())
+        XCTAssertEqual(stored.content, expectedContent)
+        XCTAssertEqual(stored.raw, message.raw)
+    }
+
+    func testResyncingAJsonElementReportsNoChange() throws {
+        let store = try makeStore()
+        let owner = MessageOwner(kind: .userId, id: "alice")
+        let data = try XCTUnwrap(jsonObjectPayload.data(using: .utf8))
+
+        try replaceAllSync(store, MessagesFetchResponse.parse(data).messages, owner: owner)
+        let second = try replaceAllSync(store, MessagesFetchResponse.parse(data).messages, owner: owner)
+
+        XCTAssertEqual(second.unchanged, 1, "an object's key order must not make a re-fetched message look updated")
+        XCTAssertEqual(second.updatedIds, [])
+    }
+
+    func testJsonNumbersUpToTheBackendMaximumSurviveStorage() throws {
+        let payload = MessagesGoldenPayload_Tests.embeddedMessage(
+            id: "msg_json_numbers_001",
+            elements: """
+            [{ "tag": "limits", "elementType": "Json", "json": [9007199254740991, -9007199254740991, 0.1] }]
+            """
+        )
+        let message = try XCTUnwrap(MessagesFetchResponse.parse(XCTUnwrap(payload.data(using: .utf8))).messages.first)
+        let stored = try storeAndReadBack(message, in: try makeStore())
+
+        let numbers = try XCTUnwrap(stored.content?["elements"]?[0]?["json"])
+        XCTAssertEqual(numbers[0]?.decimalValue, Decimal(string: "9007199254740991"))
+        XCTAssertEqual(numbers[1]?.decimalValue, Decimal(string: "-9007199254740991"))
+        XCTAssertEqual(numbers[2]?.decimalValue, Decimal(string: "0.1"))
+    }
+
+    func testJsonElementAtTheBackendNestingLimitSurvivesStorage() throws {
+        let depth = 20
+        let nested = String(repeating: #"{"level":"#, count: depth - 1) + #"["leaf"]"# + String(repeating: "}", count: depth - 1)
+        let payload = MessagesGoldenPayload_Tests.embeddedMessage(
+            id: "msg_json_deep_001",
+            elements: #"[{ "tag": "tree", "elementType": "Json", "json": \#(nested) }]"#
+        )
+        let message = try XCTUnwrap(MessagesFetchResponse.parse(XCTUnwrap(payload.data(using: .utf8))).messages.first)
+        let stored = try storeAndReadBack(message, in: try makeStore())
+
+        var node = try XCTUnwrap(stored.content?["elements"]?[0]?["json"])
+        for _ in 0..<(depth - 1) {
+            node = try XCTUnwrap(node["level"])
+        }
+        XCTAssertEqual(node[0]?.stringValue, "leaf")
+    }
+
+    func testJsonElementNearTheInboxItemLimitSurvivesAStoreReopen() throws {
+        let rows = (0..<3150).map { index in
+            #"{"sku":"sku_\#(index)","label":"\#(String(repeating: "x", count: 64))","price":\#(index).5,"tags":["a","b"]}"#
+        }
+        let payload = MessagesGoldenPayload_Tests.embeddedMessage(
+            id: "msg_json_large_001",
+            elements: #"[{ "tag": "catalog", "elementType": "Json", "json": { "rows": [\#(rows.joined(separator: ","))] } }]"#
+        )
+        let data = try XCTUnwrap(payload.data(using: .utf8))
+        // The inbox stores a message as one item of at most 400 KB.
+        XCTAssertGreaterThan(data.count, 390_000)
+        XCTAssertLessThanOrEqual(data.count, 400_000)
+
+        let response = try MessagesFetchResponse.parse(data)
+        XCTAssertEqual(response.malformedCount, 0)
+        let message = try XCTUnwrap(response.messages.first)
+
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let url = directory.appendingPathComponent("messages.sqlite")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let owner = MessageOwner(kind: .userId, id: "alice")
+
+        do {
+            let store = try MessageStore(location: .explicit(url))
+            _ = try storeAndReadBack(message, in: store)
+        }
+
+        let reopened = try MessageStore(location: .explicit(url))
+        let stored = try XCTUnwrap(reopened.message(withId: "msg_json_large_001", owner: owner))
+        XCTAssertEqual(stored.raw, message.raw)
+        XCTAssertEqual(try stored.payloadData(), try message.payloadData())
+
+        let storedRows = stored.content?["elements"]?[0]?["json"]?["rows"]
+        XCTAssertEqual(storedRows?.arrayValue?.count, 3150)
+        XCTAssertEqual(storedRows?[3149]?["sku"]?.stringValue, "sku_3149")
+        XCTAssertEqual(storedRows?[3149]?["price"]?.decimalValue, Decimal(string: "3149.5"))
+    }
+
     // 200 messages per chunk.
 
     func testBareObjectEnvelopeThrowsRatherThanParsingAsEmpty() throws {
